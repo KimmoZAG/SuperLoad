@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Ascend 910B2 上五条 KV Cache 加载路径的可复现实验，包含两种负载、原始数据和论文级消融。">
+  <title>SuperLoad · KV Cache 加载实验</title>
+  <link rel="stylesheet" href="assets/style.css">
+  <script defer src="assets/report.js"></script>
+</head>
+<body>
+  <a class="skip" href="#main">跳到内容</a>
+  <header class="top">
+    <div class="frame top-inner">
+      <a class="wordmark" href="./"><span class="mark" aria-hidden="true"></span>SuperLoad</a>
+      <nav aria-label="报告导航">
+        <a href="#results">实验结果</a>
+        <a href="#methods">五种方案</a>
+        <a href="#reproduce">复现</a>
+      </nav>
+      <a class="repo" href="https://github.com/KimmoZAG/SuperLoad">GitHub</a>
+    </div>
+  </header>
+  <main id="main">
+    <section class="hero">
+      <div class="frame hero-inner">
+        <div>
+          <p class="context">ASCEND 910B2 <span aria-hidden="true">/</span> 2026.11.26</p>
+          <h1>KV Cache<br>从存储到 NPU</h1>
+          <p class="lede">在同一张 910B2 上回放多轮对话前缀和稀疏解码，测量文件里的 KV 页何时能在 HBM 中使用。</p>
+          <a class="primary" href="#results">查看实测数据</a>
+        </div>
+        <div class="schematic" aria-label="原生数据路径从存储文件经主机 DRAM 到设备 HBM">
+          <div class="layer"><span>存储</span><span>KV 文件</span></div>
+          <div class="layer"><span>主机</span><span>DRAM</span></div>
+          <div class="layer last"><span>设备</span><span>NPU HBM</span></div>
+          <p>openEuler 24.03 · CANN 9.1.0 · Longhorn ext4</p>
+        </div>
+      </div>
+    </section>
+
+    <div class="frame body">
+      <section id="results" aria-labelledby="results-title">
+        <div class="section-top">
+          <div><h2 id="results-title">实测结果</h2><p>各轮分位数和吞吐取中位数。主实验使用预热页缓存，Direct I/O 对照使用同一语料。</p></div>
+          <a class="text-link" href="assets/summary.json" download>下载汇总 JSON</a>
+        </div>
+        <div class="tabs" data-switch hidden aria-label="负载选择">
+          <button type="button" data-target="interactive-prefix" aria-pressed="true">多轮对话前缀</button>
+          <button type="button" data-target="sparse-decode" aria-pressed="false">稀疏解码</button>
+        </div>
+        @@RESULTS@@
+      </section>
+
+      <section id="analysis" aria-labelledby="analysis-title">
+        <div class="section-top"><div><h2 id="analysis-title">测量解释</h2><p>用同负载的配对消融判断变化来自布局、调度还是预取。</p></div></div>
+        @@INSIGHTS@@
+      </section>
+
+      <section id="methods" aria-labelledby="methods-title">
+        <div class="section-top"><div><h2 id="methods-title">五种方案</h2><p>三篇论文都收录在 2026 年 CCF A 会议。<a href="https://www.ccf.org.cn/Academic_Evaluation/ARCH_DCP_SS/">CCF 存储目录</a> · <a href="https://www.ccf.org.cn/Academic_Evaluation/TCSE_SS_PDL/">CCF 系统软件目录</a></p></div></div>
+        <div class="method-list">
+          <article>
+            <div><h3>原生加载</h3><p class="badge measured">实测基线</p></div>
+            <p>layer-major 文件通过 <code>preadv</code> 读入对齐主机缓冲，随后 <code>aclrtMemcpy</code> 同步拷到 HBM。记录文件读取、缓冲整理和 H2D 耗时。</p>
+          </article>
+          <article>
+            <div><h3>远端昇腾 HIXL</h3><p class="badge blocked">单设备建链受限</p></div>
+            <p>存储侧读到已注册的主机内存。推理侧用 <code>TransferSync(READ)</code> 将 KV 拉到已注册的 HBM。两端在同一张 NPU 上注册成功，CANN 在 Connect 阶段返回 <code>103900</code> 并记录同设备建链限制。<a href="https://www.hiascend.com/document/detail/en/CANNCommunityEdition/910/commlib/hixlug/llmcdv2_42_29.html">HIXL 接口</a></p>
+          </article>
+          <article>
+            <div><h3>Strata</h3><p class="badge">OSDI ’26</p></div>
+            <p>复现 page-first 布局与批内前缀共享。相邻页发成一次文件读。同批并发请求共享已加载的 HBM 页。把布局和共享拆开对照。<a href="https://www.usenix.org/conference/osdi26/presentation/xie-zhiqiang">正式论文</a></p>
+          </article>
+          <article>
+            <div><h3>Bidaw</h3><p class="badge">FAST ’26</p></div>
+            <p>同批先服务全 DRAM 命中请求，再按缺页字节数排序。用上一轮合成回复长度和在线采样的复用距离估计淘汰优先级。LRU 对照使用相同的 24 页容量。<a href="https://www.usenix.org/conference/fast26/presentation/hu-shipeng">正式论文</a></p>
+          </article>
+          <article>
+            <div><h3>SolidAttention</h3><p class="badge">FAST ’26</p></div>
+            <p>按 token 交织 K/V，每层连续读出 K 和 V。稀疏解码用上一步的动态选择启动后台读，回放时补齐未命中的页。未被消费的预取计入文件 I/O。<a href="https://www.usenix.org/conference/fast26/presentation/zheng">正式论文</a></p>
+          </article>
+        </div>
+      </section>
+
+      <section id="reproduce" aria-labelledby="reproduce-title">
+        <div class="section-top"><div><h2 id="reproduce-title">复现实验</h2><p>语料固定为 192 页，每页 2 MiB。使用 4 层 GQA 的 BF16 字节形状，索引和 payload 可用固定种子重建。</p></div></div>
+        <div class="repro-grid">
+          <div class="shell" aria-label="回放命令"><pre><code>source /usr/local/Ascend/ascend-toolkit/set_env.sh
+python3 -m superload build-corpus data/kv
+for f in data/kv/*.bin; do cat "$f" &gt;/dev/null; done
+python3 scripts/run_matrix.py --corpus data/kv \
+  --io buffered --run-label buffered-primary \
+  --output runs/buffered</code></pre></div>
+          <div>
+            <dl class="definitions">
+              <dt>KV 就绪延迟</dt><dd>从请求到达到可读 HBM，含同批排队，单位 ms。</dd>
+              <dt>逻辑吞吐</dt><dd>所有请求可消费 KV 的字节总量除以墙钟时间。同页可重复消费。</dd>
+              <dt>计时范围</dt><dd>覆盖 KV 回载。原论文推理吞吐、TTFT、TPOT 和精度需要在完整推理引擎中复现。</dd>
+            </dl>
+            <p class="resource-links"><a href="https://github.com/KimmoZAG/SuperLoad/blob/main/docs/experiment.md">完整实验方法</a> · <a href="https://github.com/KimmoZAG/SuperLoad/blob/main/docs/hixl.md">HIXL 双机运行</a> · <a href="https://github.com/KimmoZAG/SuperLoad/tree/main/results/ascend-910b2">原始样本</a></p>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+  <footer><div class="frame">SuperLoad <span>Ascend 910B2 · KV Cache I/O</span></div></footer>
+</body>
+</html>

@@ -27,7 +27,7 @@ python3 -m superload bench --corpus data/kv --profile interactive-prefix --schem
 | Bidaw | `bidaw` | DRAM/文件感知排序和基于回复长度的淘汰 |
 | SolidAttention | `solid` | 分层 token-wise K/V 交织和稀疏选择历史预取 |
 
-三篇论文均发表于 2026 年 CCF A 会议。这里复现的是其数据布局、调度和预取机制。完整模型、注意力内核及原论文 GPU 服务端结果需要原论文环境。RoCE 使用同节点双进程和同一端口，跨机条件下的网络性能待测。
+论文方案复现了数据布局、调度和预取机制。完整模型、注意力内核及原论文 GPU 服务端结果需要原论文环境。RoCE 使用同节点双进程和同一端口，跨机条件下的网络性能待测。
 
 ## 复跑实验矩阵
 

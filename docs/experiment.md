@@ -9,9 +9,7 @@
 
 负载是带有真实 KV 形状的合成字节轨迹。固定 192 页，默认每页为 2 × 4 层 × 8 KV heads × 128 head dimension × 128 tokens × 2 字节 = 2 MiB。源数据由 SHAKE-256 生成，三种布局表示同一逻辑数据。不同页的数据独立，回读验证能够识别页错位、读截断和布局错误。语料种子 1729、回放种子 42。
 
-## 论文选择与实现
-
-FAST 和 OSDI 均列为 CCF A。原文在 2026 年会议的正式论文集中可查。 [CCF 体系结构与存储](https://www.ccf.org.cn/Academic_Evaluation/ARCH_DCP_SS/) · [CCF 系统软件](https://www.ccf.org.cn/Academic_Evaluation/TCSE_SS_PDL/)
+## 论文机制与实现
 
 ### Strata · OSDI ’26
 

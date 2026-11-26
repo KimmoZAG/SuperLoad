@@ -13,6 +13,7 @@ from figures import render, stage_values
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
+STATIC = HERE / "static"
 NAMES = {
     "native": "原生加载", "roce": "RoCE RC", "strata": "Strata", "bidaw": "Bidaw",
     "solid": "SolidAttention", "native-lru": "原生 + LRU", "strata-io": "Strata 仅布局",
@@ -217,8 +218,8 @@ def main():
     render(matrix, args.output / "figures")
     static = args.output / "assets"
     static.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(HERE / "style.css", static / "style.css")
-    shutil.copyfile(HERE / "report.js", static / "report.js")
+    shutil.copyfile(STATIC / "style.css", static / "style.css")
+    shutil.copyfile(STATIC / "report.js", static / "report.js")
     output = {"schema": 1, "runs": []}
     for cell in matrix.values():
         row = {k: v for k, v in cell.items() if k != "trials"}
@@ -227,7 +228,7 @@ def main():
             row["stage_mean_ms_per_request"] = dict(zip(keys, stage_values(cell)))
         output["runs"].append(row)
     (static / "summary.json").write_text(json.dumps(output, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    template = (HERE / "index.html").read_text(encoding="utf-8")
+    template = (STATIC / "index.html").read_text(encoding="utf-8")
     detail = "\n".join((
         figure("latency-ecdf", "两种负载的请求级延迟分布",
                "横轴为对数刻度，四个面板使用相同尺度。虚线为 95% 分位参考。每条曲线汇集该配置的全部请求，"

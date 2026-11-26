@@ -47,14 +47,23 @@ python3 -m unittest discover -s tests -v
 ## 目录
 
 ```text
-superload/                负载生成、语料布局、回放与方案
-native/                   libibverbs RoCE RC 传输
+superload/
+  cli.py                  命令行参数和执行入口
+  dataset/                两种负载、KV 语料及文件布局
+  benchmark/              回放、计时、统计和 HBM 字节校验
+  schemes/                本地读取、Bidaw 缓存和 RoCE 服务与客户端
+  hardware/               主机缓冲、AscendCL 与 libibverbs 绑定
+native/                   RoCE C++ 实现和 CMake 构建入口
 scripts/                  实验矩阵与双进程编排
-tests/                    语料一致性和数据路径回归测试
+tests/                    负载、缓存策略和回放测试
 docs/                     论文机制映射、指标与 RoCE 运行步骤
 results/ascend-910b2/      实测原始数据，按 I/O 模式归档
-report/                   网页报告和矢量图生成
+report/
+  build.py / figures.py    读取结果并生成网页和矢量图
+  static/                 网页模板、样式和交互
 .github/workflows/        Python 测试及 GitHub Pages 部署
 ```
+
+原生加载、Strata 和 SolidAttention 共用 `schemes/local.py` 中的文件读取。Strata 的批内共享在 `benchmark/replay.py`，SolidAttention 的 K/V 交织布局在 `dataset/corpus.py`，后台预取在 `schemes/local.py`。生成的语料、构建产物和新跑的测量分别放在 `data/`、`build/` 和 `runs/`。
 
 使用 Python 3.12 安装 `python3 -m pip install -r report/requirements.txt`，再运行 `python3 report/build.py` 生成网页、SVG 和 PDF。GitHub Actions 检查数据和测试，并在 `main` 推送时部署 Pages。

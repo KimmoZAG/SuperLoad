@@ -13,6 +13,7 @@ class HostCache:
         self.last_reply = {}
         self.distances = defaultdict(lambda: deque(maxlen=32))
         self.scores = {}
+        self.sessions_in_wave = set()
         self.tick = 0
 
     def begin_request(self, req):
@@ -20,17 +21,25 @@ class HostCache:
             return
         self.tick += 1
         prev = self.last_session.get(req.session)
-        if prev is not None:
+        if prev is not None and req.session not in self.sessions_in_wave:
             distance = sum(last > prev for last in self.last_page.values())
             self.distances[req.session].append((self.last_reply[req.session], distance))
+        self.sessions_in_wave.add(req.session)
         self.last_session[req.session] = self.tick
-        self.last_reply[req.session] = req.answer_tokens
         for page in req.pages:
             self.last_page[page] = self.tick
         self.scores[req.session] = self.potential(req.session)
 
+    def finish_wave(self, requests):
+        if not self.hint_aware:
+            return
+        self.last_reply.update((req.session, req.answer_tokens) for req in requests)
+        for session in self.sessions_in_wave:
+            self.scores[session] = self.potential(session)
+        self.sessions_in_wave.clear()
+
     def potential(self, session):
-        answer = self.last_reply[session]
+        answer = self.last_reply.get(session, 0)
         observations = self.distances[session]
         # Estimate a lower quantile from completed turns with similarly long replies.
         similar = sorted(d for a, d in observations if a >= answer)

@@ -124,6 +124,8 @@ def wave_requests(wave, args, spec, load, base, cache, prefetched):
                 "pages": len(req.pages),
             })
             snapshot.extend(req.pages)
+        if cache is not None:
+            cache.finish_wave(requests)
     metrics["logical_pages"] = sum(row["pages"] for row in rows)
     metrics["active_ns"] = done - start
     return metrics, rows, snapshot

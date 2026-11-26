@@ -43,7 +43,7 @@
     <div class="frame body">
       <section id="results" aria-labelledby="results-title">
         <div class="section-top">
-          <div><h2 id="results-title">实测结果</h2><p>同一语料分开测量 Buffered 和 Direct I/O。比较延迟时数值越低越好，比较吞吐时数值越高越好。</p></div>
+          <div><h2 id="results-title">实测结果</h2><p>同一语料分开测量 Buffered 和 Direct I/O。Bidaw 与 LRU 来自同配置的配对补测。比较延迟时数值越低越好，比较吞吐时数值越高越好。</p></div>
           <a class="text-link" href="assets/summary.json" download>下载汇总 JSON</a>
         </div>
         <div class="tabs" data-switch hidden aria-label="负载选择">
@@ -80,7 +80,7 @@
           </article>
           <article>
             <div><h3>Bidaw</h3><p class="badge">FAST ’26</p></div>
-            <p>同批先服务全 DRAM 命中请求，再按缺页字节数排序。用上一轮合成回复长度和在线采样的复用距离估计淘汰优先级。LRU 对照使用相同的 24 页容量。<a href="https://www.usenix.org/conference/fast26/presentation/hu-shipeng">正式论文</a></p>
+            <p>同批先服务全 DRAM 命中请求，再按缺页字节数排序。用已完成批次的合成回复长度及复用距离估计淘汰优先级。Bidaw 和等容量 LRU 已按修正后的时序成对重测。<a href="https://www.usenix.org/conference/fast26/presentation/hu-shipeng">正式论文</a></p>
           </article>
           <article>
             <div><h3>SolidAttention</h3><p class="badge">FAST ’26</p></div>

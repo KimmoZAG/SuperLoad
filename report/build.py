@@ -79,6 +79,8 @@ def load(results):
     for mode in ("buffered", "direct"):
         for profile in PROFILES:
             base = matrix[mode, profile, "native"]
+            if matrix[mode, profile, "bidaw"]["run"] != matrix[mode, profile, "native-lru"]["run"]:
+                raise ValueError(f"Bidaw and LRU must share a measurement run for {mode}/{profile}")
             for (cell_mode, cell_profile, scheme), cell in matrix.items():
                 if (cell_mode, cell_profile) != (mode, profile):
                     continue

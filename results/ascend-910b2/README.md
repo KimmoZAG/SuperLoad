@@ -6,5 +6,6 @@
 - `direct/` 是同一语料的 O_DIRECT 敏感性对照。每种配置两轮，每轮 8 个测量批次、1 个预热批次。
 - 各模式下的 `*.roce.json` 记录同节点两个 RC 端点的传输字节与分段耗时。两端使用同一网口，窗口为 32 KiB。
 - `validation/` 保存两种 RoCE 负载在 Buffered 模式下逐批回读的短跑。性能样本使用末批回读。
+- Bidaw 的回复可见时序修正后，两种负载各自与等容量 LRU 成对重测。原始 JSON 用 `run` 字段标记复测批次，其它方案来自前一批硬件矩阵。
 
 运行 `python3 report/build.py` 可从这些数据重新生成网页与汇总 JSON。 [参数、指标与论文机制](../../docs/experiment.md)

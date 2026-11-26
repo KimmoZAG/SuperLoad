@@ -44,6 +44,25 @@ python3 -m unittest discover -s tests -v
 
 `--verify all` 会对每个批次做设备回读。正式计时用 `last`，每轮在计时结束后核查最后一批。完整原始 JSON 记录每个样本和批次计数。消融项 `strata-io`、`native-lru`、`solid-io` 在相应负载下与主方法配对。
 
+## 发布实验结果
+
+当前数据批次包含 28 组性能测量和 2 份 RoCE 回读校验记录。[下载原始结果 ZIP](https://github.com/KimmoZAG/SuperLoad/releases/download/results-ascend-910b2-2026-11-26/ascend-910b2-2026-11-26.zip)
+
+1. 用 `python3 report/build.py --results runs` 检查本地结果。归档根目录直接包含 `buffered/`、`direct/` 和可选的 `validation/`。同一批次的运行参数、环境和测量范围可随 ZIP 附上 README。
+2. 从仓库根目录打包并发布。先确认实验代码的提交已推送到 GitHub，并用 `gh auth login` 登录。将 `batch` 改为本批次的日期，同日多批可加 `-r2` 等后缀。
+
+   ```bash
+   batch=YYYY-MM-DD
+   tag="results-ascend-910b2-${batch}"
+   archive="$PWD/runs/ascend-910b2-${batch}.zip"
+   (cd runs && python3 -m zipfile -c "$archive" buffered direct)
+   gh release create "$tag" "$archive" --target "$(git rev-parse HEAD)" \
+     --title "Ascend 910B2 实验数据 · $batch" --notes "原始测量与运行参数" --latest=false
+   sha256sum "$archive"
+   ```
+
+3. Release 发布后，将 `report/results-release.json` 中的 `tag`、`asset` 和 `sha256` 更新为新标签、ZIP 文件名和上一步的校验值。运行 `python3 report/build.py` 验证附件可下载并通过校验，再提交并推送清单。GitHub Actions 会用该版本重新部署报告。
+
 ## 目录
 
 ```text

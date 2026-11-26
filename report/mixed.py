@@ -50,7 +50,7 @@ def panels(runs):
                 cells.append(f'<td><abbr title="{span}">{median(samples):.{digits}f}</abbr></td>')
             rows.append(f'<tr><th scope="row">{label}</th>{"".join(cells)}</tr>')
         sections.append(
-            f'<article class="profile"><div class="table-wrap" role="region" aria-label="{caption}" tabindex="0">'
+            f'<article class="profile"><div class="table-wrap mixed-table" role="region" aria-label="{caption}" tabindex="0">'
             f'<table><caption>{caption}。{workload}</caption><thead><tr>'
             '<th scope="col">方案</th><th scope="col">前缀 P95（ms）</th>'
             '<th scope="col">稀疏 P95（ms）</th><th scope="col">逻辑吞吐（GiB/s）</th>'

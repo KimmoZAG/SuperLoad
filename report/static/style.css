@@ -111,6 +111,8 @@ footer span { color: #bad7cd; font-weight: 450; }
   .schematic { max-width: 24rem; }
 }
 @media (max-width: 33rem) {
+  .mixed-table table { white-space: normal; font-size: .82rem; }
+  .mixed-table th, .mixed-table td { padding-inline: .32rem; }
   .top-inner { flex-wrap: wrap; padding-block: .5rem; gap: .4rem .8rem; }
   .top nav { order: 1; width: 100%; font-size: .89rem; }
   .method-list article { grid-template-columns: 1fr; gap: .45rem; }

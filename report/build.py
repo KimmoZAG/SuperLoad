@@ -9,6 +9,7 @@ from pathlib import Path
 from statistics import median
 
 from figures import render, stage_values
+from release_data import ResultsRelease
 
 
 HERE = Path(__file__).resolve().parent
@@ -211,16 +212,24 @@ def insights(matrix):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--results", type=Path, default=ROOT / "results/ascend-910b2")
+    ap.add_argument("--results", type=Path, help="Use a local results directory instead of the pinned release")
     ap.add_argument("--output", type=Path, default=ROOT / "build/site")
     args = ap.parse_args()
-    matrix = load(args.results)
+    release = None
+    if args.results is None:
+        release = ResultsRelease.read(HERE / "results-release.json")
+        with release.unpack(ROOT / "build" / "results") as directory:
+            matrix = load(directory)
+    else:
+        matrix = load(args.results)
     render(matrix, args.output / "figures")
     static = args.output / "assets"
     static.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(STATIC / "style.css", static / "style.css")
     shutil.copyfile(STATIC / "report.js", static / "report.js")
     output = {"schema": 1, "runs": []}
+    if release is not None:
+        output["results_release"] = {"tag": release.tag, "url": release.page_url, "sha256": release.sha256}
     for cell in matrix.values():
         row = {k: v for k, v in cell.items() if k != "trials"}
         if cell["scheme"] in ("native", "roce"):
@@ -240,8 +249,9 @@ def main():
                "每段为逐轮每请求均值再取平均。同一 I/O 模式的两个面板共用刻度。"
                "RC 段含注册窗口整理，堆叠值只覆盖加载阶段。"),
     ))
+    raw_link = f' · <a href="{html.escape(release.page_url)}">原始样本（Release）</a>' if release else ""
     report = (template.replace("@@RESULTS@@", panels(matrix)).replace("@@INSIGHTS@@", insights(matrix))
-              .replace("@@FIGURES@@", detail))
+              .replace("@@FIGURES@@", detail).replace("@@RESULTS_RELEASE@@", raw_link))
     (args.output / "index.html").write_text(report, encoding="utf-8")
     print(f"Built {args.output / 'index.html'} and vector figures from {len(matrix)} measured cells")
 

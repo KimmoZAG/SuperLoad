@@ -2,7 +2,7 @@
 
 Ascend 910B2 上的 KV Cache 存储加载基准。两种确定性负载分别模拟多轮对话的稠密前缀回载，以及长上下文解码的稀疏页面回载。基准在 NPU HBM 中校验字节，记录从请求到 KV 就绪的延迟、逻辑吞吐、文件读放大和设备侧传输字节。
 
-[在线实验报告](https://kimmozag.github.io/SuperLoad/) · [实验方法与论文复现范围](docs/experiment.md) · [RoCE 运行说明](docs/roce.md) · [原始测量](results/ascend-910b2/)
+[在线实验报告](https://kimmozag.github.io/SuperLoad/) · [实验方法与论文复现范围](docs/experiment.md) · [RoCE 运行说明](docs/roce.md) · [原始测量](https://github.com/KimmoZAG/SuperLoad/releases/tag/results-ascend-910b2-2026-11-26)
 
 ## 快速运行
 
@@ -57,13 +57,13 @@ native/                   RoCE C++ 实现和 CMake 构建入口
 scripts/                  实验矩阵与双进程编排
 tests/                    负载、缓存策略和回放测试
 docs/                     论文机制映射、指标与 RoCE 运行步骤
-results/ascend-910b2/      实测原始数据，按 I/O 模式归档
 report/
   build.py / figures.py    读取结果并生成网页和矢量图
+  results-release.json    固定数据发布版本及 SHA-256
   static/                 网页模板、样式和交互
 .github/workflows/        Python 测试及 GitHub Pages 部署
 ```
 
 原生加载、Strata 和 SolidAttention 共用 `schemes/local.py` 中的文件读取。Strata 的批内共享在 `benchmark/replay.py`，SolidAttention 的 K/V 交织布局在 `dataset/corpus.py`，后台预取在 `schemes/local.py`。生成的语料、构建产物和新跑的测量分别放在 `data/`、`build/` 和 `runs/`。
 
-使用 Python 3.12 安装 `python3 -m pip install -r report/requirements.txt`，再运行 `python3 report/build.py` 生成网页、SVG 和 PDF。GitHub Actions 检查数据和测试，并在 `main` 推送时部署 Pages。
+使用 Python 3.12 安装 `python3 -m pip install -r report/requirements.txt`，再运行 `python3 report/build.py` 生成网页、SVG 和 PDF。构建会下载并校验 `report/results-release.json` 指定的 Release 附件。已验证的归档缓存于 `build/results/`。本地复测数据可以用 `python3 report/build.py --results <已解压目录>` 生成报告。GitHub Actions 检查数据和测试，并在 `main` 推送时部署 Pages。

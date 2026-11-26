@@ -29,8 +29,6 @@ class Ascend:
         self.lib.aclrtResetDevice.argtypes = [C.c_int]
         self.lib.aclrtMalloc.argtypes = [C.POINTER(C.c_void_p), C.c_size_t, C.c_int]
         self.lib.aclrtFree.argtypes = [C.c_void_p]
-        self.lib.aclrtMallocHost.argtypes = [C.POINTER(C.c_void_p), C.c_size_t]
-        self.lib.aclrtFreeHost.argtypes = [C.c_void_p]
         self.lib.aclrtMemcpy.argtypes = [C.c_void_p, C.c_size_t, C.c_void_p, C.c_size_t, C.c_int]
         self.lib.aclGetRecentErrMsg.restype = C.c_char_p
 
@@ -56,17 +54,13 @@ class Ascend:
             self.call("aclFinalize")
 
     @contextmanager
-    def allocate(self, size, *, host=False):
+    def allocate(self, size):
         ptr = C.c_void_p()
-        if host:
-            self.call("aclrtMallocHost", C.byref(ptr), size)
-        else:
-            # ACL_MEM_MALLOC_HUGE_FIRST; the HIXL case registers the resulting HBM.
-            self.call("aclrtMalloc", C.byref(ptr), size, 0)
+        self.call("aclrtMalloc", C.byref(ptr), size, 0)  # ACL_MEM_MALLOC_HUGE_FIRST
         try:
             yield ptr.value
         finally:
-            self.call("aclrtFreeHost" if host else "aclrtFree", ptr)
+            self.call("aclrtFree", ptr)
 
     def upload(self, dest, source, size):
         self.call("aclrtMemcpy", dest, size, source, size, 1)

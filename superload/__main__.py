@@ -7,7 +7,7 @@ from pathlib import Path
 
 from .benchmark import CONTROLS, SCHEMES, run
 from .corpus import generate, read_manifest
-from .hixl import HixlError, serve
+from .roce import serve
 from .workloads import Geometry, PAGE_COUNT, PROFILES, make_trace
 
 
@@ -37,10 +37,14 @@ def corpus_args(command):
     command.add_argument("--io", choices=("buffered", "direct"), default="buffered")
 
 
-def hixl_args(command):
-    command.add_argument("--control-port", type=positive, default=35482)
-    command.add_argument("--bridge", default="build/native/libsuperload_hixl.so")
-    command.add_argument("--comm-res", help="Optional CANN LocalCommRes JSON file")
+def roce_args(command):
+    command.add_argument("--control-port", type=int, default=35482)
+    command.add_argument("--bridge", default="build/native/libsuperload_roce.so")
+    command.add_argument("--hca", default="mlx5_2")
+    command.add_argument("--ib-port", type=positive, default=1)
+    command.add_argument("--gid-index", type=int, default=5)
+    command.add_argument("--mr-bytes", type=positive, default=32768)
+    command.add_argument("--timeout-ms", type=positive, default=8000)
 
 
 def parser():
@@ -63,7 +67,7 @@ def parser():
 
     bench = commands.add_parser("bench", help="measure a scheme or an ablation against the same trace")
     corpus_args(bench)
-    hixl_args(bench)
+    roce_args(bench)
     bench.add_argument("--profile", choices=PROFILES, required=True)
     bench.add_argument("--scheme", choices=SCHEMES + CONTROLS, required=True)
     bench.add_argument("--device", default="0", help="logical Ascend device, or cpu for correctness tests")
@@ -78,15 +82,11 @@ def parser():
     bench.add_argument("--run-label", default="unspecified")
     bench.add_argument("--output")
     bench.add_argument("--control-host", default="127.0.0.1")
-    bench.add_argument("--local-engine", default="127.0.0.1")
-    bench.add_argument("--timeout-ms", type=positive, default=6000)
 
-    server = commands.add_parser("serve-hixl", help="serve a fixed local KV corpus over a HIXL window")
+    server = commands.add_parser("serve-roce", help="serve a fixed local KV corpus over RoCE RC")
     corpus_args(server)
-    hixl_args(server)
-    server.add_argument("--device", type=int, default=0)
+    roce_args(server)
     server.add_argument("--bind", default="127.0.0.1", help="IPv4 control address")
-    server.add_argument("--engine", default="127.0.0.1:35481", help="HIXL server IP:port")
     server.add_argument("--max-pages", type=positive, default=16)
     server.add_argument("--idle-timeout", type=positive, default=120)
     return cli
@@ -104,7 +104,7 @@ def main():
         waves = make_trace(args.profile, args.seed, args.waves)
         write_json({"profile": args.profile, "seed": args.seed, "waves": [asdict(w) for w in waves]}, args.output)
         return 0
-    if args.command == "serve-hixl":
+    if args.command == "serve-roce":
         if args.max_pages > PAGE_COUNT:
             cli.error(f"max-pages may not exceed {PAGE_COUNT}")
         serve(args)
@@ -120,13 +120,12 @@ def main():
         "waves": args.waves, "repeat": args.repeat, "warmup": args.warmup, "verify": args.verify,
         "cache_pages": args.cache_pages, "prefetch_pages": args.prefetch_pages,
     }
-    try:
-        result.update(run(args, spec, corpus_seed))
-    except HixlError as error:
-        result.update(status="blocked", phase=error.phase, hixl_status=error.status)
-        write_json(result, args.output)
-        print(error, file=sys.stderr)
-        return 2
+    if args.scheme == "roce":
+        result["roce"] = {
+            "hca": args.hca, "port": args.ib_port, "gid_index": args.gid_index, "mr_bytes": args.mr_bytes,
+            "control_loopback": args.control_host == "127.0.0.1",
+        }
+    result.update(run(args, spec, corpus_seed))
     write_json(result, args.output)
     return 0
 

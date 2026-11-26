@@ -1,4 +1,4 @@
-"""Build GitHub Pages from checked-in hardware results using only stdlib."""
+"""Build the report and vector figures from checked-in hardware results."""
 
 import argparse
 import html
@@ -8,11 +8,13 @@ import shutil
 from pathlib import Path
 from statistics import median
 
+from figures import render, stage_values
+
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 NAMES = {
-    "native": "原生加载", "hixl": "HIXL", "strata": "Strata", "bidaw": "Bidaw",
+    "native": "原生加载", "roce": "RoCE RC", "strata": "Strata", "bidaw": "Bidaw",
     "solid": "SolidAttention", "native-lru": "原生 + LRU", "strata-io": "Strata 仅布局",
     "solid-io": "SolidAttention 仅布局",
 }
@@ -28,7 +30,7 @@ PROFILES = {
         "controls": ("native-lru", "solid-io"),
     },
 }
-MEASURED = ("native", "strata", "bidaw", "solid")
+MEASURED = ("native", "roce", "strata", "bidaw", "solid")
 FIELDS = ("p50_ms", "p95_ms", "p99_ms", "ready_gib_s", "reads_per_request",
           "read_bytes_per_logical_byte", "hbm_bytes_per_logical_byte")
 LABELS = ("P50 ms", "P95 ms", "P99 ms", "逻辑 GiB/s", "读调用/请求", "读/逻辑字节", "HBM/逻辑字节")
@@ -45,11 +47,17 @@ def validate(result, path, key):
         raise ValueError(f"unexpected result in {path}")
     if len(result["trials"]) != result["repeat"] or not result["trials"]:
         raise ValueError(f"invalid trials in {path}")
+    if key[-1] == "roce" and result.get("roce", {}).get("control_loopback") is not True:
+        raise ValueError(f"this report expects a same-node RoCE measurement in {path}")
     for trial in result["trials"]:
         if trial["counters"].get("verified_pages", 0) <= 0:
             raise ValueError(f"missing device verification in {path}")
         if len(trial["requests"]) != trial["summary"]["requests"] or len(trial["waves"]) != result["waves"]:
             raise ValueError(f"bad sample counts in {path}")
+        if key[-1] == "roce":
+            c = trial["counters"]
+            if not (c["roce_ns"] > 0 and c["roce_bytes"] == c["hbm_bytes"] == c["storage_bytes"] > 0):
+                raise ValueError(f"inconsistent RoCE transfer in {path}")
     for field, value in result["summary"].items():
         if not math.isfinite(value) or not math.isclose(value, median(t["summary"][field] for t in result["trials"])):
             raise ValueError(f"invalid summary for {field} in {path}")
@@ -62,10 +70,8 @@ def load(results):
     matrix = {}
     for mode in ("buffered", "direct"):
         for profile, metadata in PROFILES.items():
-            for scheme in (*MEASURED, *metadata["controls"], "hixl"):
+            for scheme in (*MEASURED, *metadata["controls"]):
                 path = results / mode / f"{profile}.{scheme}.json"
-                if scheme == "hixl" and not path.exists():
-                    continue
                 result = read_json(path)
                 key = (mode, profile, scheme)
                 validate(result, path, key)
@@ -74,25 +80,18 @@ def load(results):
         for profile in PROFILES:
             base = matrix[mode, profile, "native"]
             for (cell_mode, cell_profile, scheme), cell in matrix.items():
-                if (cell_mode, cell_profile) != (mode, profile) or scheme == "hixl":
+                if (cell_mode, cell_profile) != (mode, profile):
                     continue
                 for field in ("geometry", "corpus_seed", "trace_seed", "waves", "repeat", "warmup", "storage"):
                     if cell[field] != base[field]:
                         raise ValueError(f"mismatched {field} for {mode}/{profile}/{scheme}")
-    hixl = read_json(results / "hixl-loopback.json")
-    if hixl.get("scheme") != "hixl" or hixl.get("backend") != "ascend" or hixl.get("status") != "blocked":
-        raise ValueError("expected the Ascend same-device HIXL probe")
-    return matrix, hixl
+    return matrix
 
 
-def chip_table(matrix, mode, profile, schemes, hixl):
+def chip_table(matrix, mode, profile, schemes):
     rows = []
     for scheme in schemes:
-        cell = matrix.get((mode, profile, scheme))
-        if not cell:
-            message = f'Connect {hixl["hixl_status"]} · 需独立端点'
-            rows.append(f'<tr><th scope="row">HIXL</th><td class="missing" colspan="7">{html.escape(message)}</td></tr>')
-            continue
+        cell = matrix[mode, profile, scheme]
         summary = cell["summary"]
         p95 = [trial["summary"]["p95_ms"] for trial in cell["trials"]]
         hint = f"各轮 P95 范围 {min(p95):.2f}–{max(p95):.2f} ms"
@@ -101,7 +100,7 @@ def chip_table(matrix, mode, profile, schemes, hixl):
             value = summary[field]
             label = f'<abbr title="{hint}">{value:.2f}</abbr>' if field == "p95_ms" else f"{value:.2f}"
             values.append(f"<td>{label}</td>")
-        row_class = ' class="control"' if scheme not in (*MEASURED, "hixl") else ""
+        row_class = ' class="control"' if scheme not in MEASURED else ""
         rows.append(f'<tr{row_class}><th scope="row">{NAMES[scheme]}</th>{"".join(values)}</tr>')
     cols = "".join(f'<th scope="col">{label}</th>' for label in ("方案", *LABELS))
     caption = "Buffered I/O 实测与消融" if mode == "buffered" else "Direct I/O 敏感性试验"
@@ -111,51 +110,44 @@ def chip_table(matrix, mode, profile, schemes, hixl):
     )
 
 
-def chart(matrix, profile):
-    data = [(scheme, matrix["buffered", profile, scheme]["summary"])
-            for scheme in (*MEASURED, "hixl") if ("buffered", profile, scheme) in matrix]
-    high = max(row["p95_ms"] for _, row in data)
-    rows = []
-    for scheme, row in data:
-        p95, gib = row["p95_ms"], row["ready_gib_s"]
-        rows.append(
-            f'<div class="bar-row" data-scheme="{scheme}" data-ms="{p95:.5f}" data-gib="{gib:.5f}">'
-            f'<span>{NAMES[scheme]}</span><div class="bar-rail" aria-hidden="true">'
-            f'<div class="bar-fill" style="--size:{p95 / high * 100:.2f}%"></div></div>'
-            f'<span class="value">{p95:.2f}</span></div>'
-        )
+def figure(name, alt, caption):
     return (
-        '<div class="chart"><div class="chart-head">'
-        '<strong data-metric-title>P95 就绪延迟 (ms) · 越低越好</strong>'
-        '<div class="metric" aria-label="图表指标" hidden>'
-        '<button type="button" data-metric="ms" aria-pressed="true">延迟</button>'
-        '<button type="button" data-metric="gib" aria-pressed="false">吞吐</button></div></div>'
-        f'<div class="bars">{"".join(rows)}</div></div>'
+        '<figure class="paper-figure">'
+        f'<div class="figure-viewport" tabindex="0" role="region" aria-label="{html.escape(alt)}">'
+        f'<img src="figures/{name}.svg" alt="{html.escape(alt)}" decoding="async"></div>'
+        f'<figcaption><span>{html.escape(caption)}'
+        '<span class="mobile-scroll-note">横向滑动可查看完整面板。</span></span><span class="figure-downloads">'
+        f'<a href="figures/{name}.svg" aria-label="{html.escape(alt)} SVG">SVG</a>'
+        f'<a href="figures/{name}.pdf" aria-label="{html.escape(alt)} PDF">PDF</a>'
+        '</span></figcaption></figure>'
     )
 
 
-def panels(matrix, hixl):
+def panels(matrix):
     sections = []
     for profile, meta in PROFILES.items():
-        schemes = ("native", "strata", "bidaw", "solid", "hixl", *meta["controls"])
+        schemes = (*MEASURED, *meta["controls"])
         buf = matrix["buffered", profile, "native"]
         direct = matrix["direct", profile, "native"]
         n, nd = buf["summary"]["requests"], direct["summary"]["requests"]
+        caption = (
+            f"实心菱形和标签为各轮中位数，空心点为单轮，延迟横线为实测范围。Buffered 每轮 {n:g} 个请求、{buf['repeat']} 轮，"
+            f"Direct I/O 每轮 {nd:g} 个请求、{direct['repeat']} 轮。左右同指标共用横轴，延迟使用对数刻度。"
+        )
+        plot = figure(f"{profile}-performance", f"{meta['title']}的 P95 延迟和逻辑吞吐", caption)
         sections.append(
             f'<article class="profile" data-profile="{profile}" aria-labelledby="{profile}-title">'
             f'<h3 id="{profile}-title">{meta["title"]}</h3><p class="blurb">{meta["about"]}</p>'
-            f'{chart(matrix, profile)}{chip_table(matrix, "buffered", profile, schemes, hixl)}'
-            f'<p class="sample">主实验每轮 {n:g} 个请求，共 {buf["repeat"]} 轮。'
-            '表中 p95 可查看跨轮范围，所有方案的尾批数据均在 HBM 中回读校验。</p>'
-            '<details><summary>展开 Direct I/O 对照</summary>'
-            f'{chip_table(matrix, "direct", profile, schemes, hixl)}'
-            f'<p class="sample">每轮 {nd:g} 个请求，共 {direct["repeat"]} 轮。'
-            '样本量较小，尾部数据用于观察 I/O 模式敏感性。</p></details></article>'
+            f'{plot}<details><summary>展开精确数值与消融对照</summary>'
+            f'{chip_table(matrix, "buffered", profile, schemes)}'
+            f'{chip_table(matrix, "direct", profile, schemes)}'
+            '<p class="sample">P95 的跨轮范围可在表中查看。每个方案都做了 HBM 回读。'
+            'Direct I/O 样本量较小，尾部数据用于观察 I/O 模式敏感性。</p></details></article>'
         )
     return "\n".join(sections)
 
 
-def insights(matrix, hixl):
+def insights(matrix):
     dense, sparse = "interactive-prefix", "sparse-decode"
 
     def metric(profile, scheme, field, mode="buffered"):
@@ -179,6 +171,9 @@ def insights(matrix, hixl):
     prefetch_wait = median(
         t["counters"]["prefetch_wait_ns"] / t["summary"]["requests"] / 1e6 for t in solid["trials"]
     )
+    transport = matrix["buffered", dense, "roce"]
+    transport_p95 = transport["summary"]["p95_ms"]
+    transport_ms = stage_values(transport)[3]
     articles = [
         ("原生路径的成本",
          f"多轮前缀下，Buffered 每请求平均文件读取 {disk_ms:.2f} ms，H2D {h2d_ms:.2f} ms。"
@@ -201,10 +196,10 @@ def insights(matrix, hixl):
          f"4 ms 步间隔之后，平均仍多等待 {prefetch_wait:.2f} ms。"
          f"Buffered P95 从 {sparse_control:.2f} ms 变为 {sparse_p95:.2f} ms，Direct P95 从 "
          f"{metric(sparse, 'solid-io', 'p95_ms', 'direct'):.2f} ms 变为 {metric(sparse, 'solid', 'p95_ms', 'direct'):.2f} ms。"),
-        ("HIXL 双机性能待测",
-         f"单设备探针在 {hixl['phase']} 返回 {hixl['hixl_status']}。独立端点可用后，"
-         "按同样的语料记录存储端文件读、控制与整理开销、HIXL 传输及 HBM 校验，"
-         "并用实际端口计数确认数据路径。"),
+        ("RoCE 回环的额外传输",
+         f"多轮前缀 Buffered P95 从原生的 {native:.2f} ms 变为 {transport_p95:.2f} ms。"
+         f"RC 传输与注册缓冲整理平均占 {transport_ms:.2f} ms/请求。"
+         "测量范围是同节点双进程、相同网口和 32 KiB 注册窗口，跨机和直达 HBM 需要各自测量。"),
     ]
     return '<div class="insights">' + "".join(
         f"<article><h3>{html.escape(title)}</h3><p>{html.escape(body)}</p></article>" for title, body in articles
@@ -216,19 +211,36 @@ def main():
     ap.add_argument("--results", type=Path, default=ROOT / "results/ascend-910b2")
     ap.add_argument("--output", type=Path, default=ROOT / "build/site")
     args = ap.parse_args()
-    matrix, hixl = load(args.results)
+    matrix = load(args.results)
+    render(matrix, args.output / "figures")
     static = args.output / "assets"
     static.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(HERE / "style.css", static / "style.css")
     shutil.copyfile(HERE / "report.js", static / "report.js")
-    output = {"schema": 1, "runs": [], "hixl_same_device": hixl}
+    output = {"schema": 1, "runs": []}
     for cell in matrix.values():
-        output["runs"].append({k: v for k, v in cell.items() if k != "trials"})
+        row = {k: v for k, v in cell.items() if k != "trials"}
+        if cell["scheme"] in ("native", "roce"):
+            keys = ("file_read", "local_staging", "control", "rc_and_staging", "h2d")
+            row["stage_mean_ms_per_request"] = dict(zip(keys, stage_values(cell)))
+        output["runs"].append(row)
     (static / "summary.json").write_text(json.dumps(output, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     template = (HERE / "index.html").read_text(encoding="utf-8")
-    report = template.replace("@@RESULTS@@", panels(matrix, hixl)).replace("@@INSIGHTS@@", insights(matrix, hixl))
+    detail = "\n".join((
+        figure("latency-ecdf", "两种负载的请求级延迟分布",
+               "横轴为对数刻度，四个面板使用相同尺度。虚线为 95% 分位参考。每条曲线汇集该配置的全部请求，"
+               "同批请求可能相关。曲线的 95% 位置与逐轮 P95 中位数的定义不同。"),
+        figure("mechanism-ablation", "三种论文机制的配对消融",
+               "分别显示 Strata 的读调用、Bidaw 和等容量 LRU 的命中率、SolidAttention 在同一布局下的预取代价。"
+               "每个点为逐轮统计的中位数。"),
+        figure("roce-stages", "原生与 RoCE 的逐阶段开销",
+               "每段为逐轮每请求均值再取平均。同一 I/O 模式的两个面板共用刻度。"
+               "RC 段含注册窗口整理，堆叠值只覆盖加载阶段。"),
+    ))
+    report = (template.replace("@@RESULTS@@", panels(matrix)).replace("@@INSIGHTS@@", insights(matrix))
+              .replace("@@FIGURES@@", detail))
     (args.output / "index.html").write_text(report, encoding="utf-8")
-    print(f"Built {args.output / 'index.html'} from {len(matrix)} measured cells and a HIXL probe")
+    print(f"Built {args.output / 'index.html'} and vector figures from {len(matrix)} measured cells")
 
 
 if __name__ == "__main__":

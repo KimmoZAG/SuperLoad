@@ -2,7 +2,7 @@
 
 Ascend 910B2 上的 KV Cache 存储加载基准。两种确定性负载分别模拟多轮对话的稠密前缀回载，以及长上下文解码的稀疏页面回载。基准在 NPU HBM 中校验字节，记录从请求到 KV 就绪的延迟、逻辑吞吐、文件读放大和设备侧传输字节。
 
-[在线实验报告](https://kimmozag.github.io/SuperLoad/) · [实验方法与论文复现范围](docs/experiment.md) · [HIXL 双机说明](docs/hixl.md) · [原始测量](results/ascend-910b2/)
+[在线实验报告](https://kimmozag.github.io/SuperLoad/) · [实验方法与论文复现范围](docs/experiment.md) · [RoCE 运行说明](docs/roce.md) · [原始测量](results/ascend-910b2/)
 
 ## 快速运行
 
@@ -22,21 +22,23 @@ python3 -m superload bench --corpus data/kv --profile interactive-prefix --schem
 | 方案 | CLI | 实现 |
 | --- | --- | --- |
 | 原生加载 | `native` | layer-major 文件 → 主机 DRAM → 同步 AscendCL H2D |
-| 昇腾 HIXL | `hixl` | 存储侧读文件到注册内存，客户端 HIXL READ 到已注册的 HBM |
+| RoCE RC 中转 | `roce` | 存储进程 → RC SEND/RECV → 接收端 DRAM → AscendCL H2D |
 | Strata | `strata` | page-first 读合并和同批前缀共享 |
 | Bidaw | `bidaw` | DRAM/文件感知排序和基于回复长度的淘汰 |
 | SolidAttention | `solid` | 分层 token-wise K/V 交织和稀疏选择历史预取 |
 
-三篇论文均发表于 2026 年 CCF A 会议。这里复现的是其数据布局、调度和预取机制。完整模型、注意力内核及原论文 GPU 服务端结果需要原论文环境。HIXL 在单设备上已完成注册与建链探针，双机性能待测。
+三篇论文均发表于 2026 年 CCF A 会议。这里复现的是其数据布局、调度和预取机制。完整模型、注意力内核及原论文 GPU 服务端结果需要原论文环境。RoCE 使用同节点双进程和同一端口，跨机条件下的网络性能待测。
 
 ## 复跑实验矩阵
 
 ```bash
+cmake -S native -B build/native -DCMAKE_BUILD_TYPE=Release
+cmake --build build/native -j 2
 for f in data/kv/*.bin; do cat "$f" >/dev/null; done
-python3 scripts/run_matrix.py --corpus data/kv --io buffered \
-  --run-label buffered-primary --output runs/buffered
-python3 scripts/run_matrix.py --corpus data/kv --io direct --waves 8 --warmup 1 --repeat 2 \
-  --run-label direct-sensitivity --output runs/direct
+python3 scripts/run_matrix.py --corpus data/kv --roce --io buffered --waves 32 \
+  --run-label buffered-primary-roce --output runs/buffered
+python3 scripts/run_matrix.py --corpus data/kv --roce --io direct --waves 8 --warmup 1 --repeat 2 \
+  --run-label direct-sensitivity-roce --output runs/direct
 python3 -m unittest discover -s tests -v
 ```
 
@@ -46,13 +48,13 @@ python3 -m unittest discover -s tests -v
 
 ```text
 superload/                负载生成、语料布局、回放与方案
-native/                   CANN HIXL C++ 适配层
-scripts/                  实验矩阵与 HIXL 单设备探针
+native/                   libibverbs RoCE RC 传输
+scripts/                  实验矩阵与双进程编排
 tests/                    语料一致性和数据路径回归测试
-docs/                     论文机制映射、指标与 HIXL 双机步骤
+docs/                     论文机制映射、指标与 RoCE 运行步骤
 results/ascend-910b2/      实测原始数据，按 I/O 模式归档
-report/                   报告模板、样式和静态构建脚本
+report/                   网页报告和矢量图生成
 .github/workflows/        Python 测试及 GitHub Pages 部署
 ```
 
-运行 `python3 report/build.py` 生成 `build/site/index.html`。GitHub Actions 检查数据和测试，并在 `main` 推送时部署 Pages。
+使用 Python 3.12 安装 `python3 -m pip install -r report/requirements.txt`，再运行 `python3 report/build.py` 生成网页、SVG 和 PDF。GitHub Actions 检查数据和测试，并在 `main` 推送时部署 Pages。

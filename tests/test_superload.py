@@ -38,7 +38,7 @@ class ReplayTest(unittest.TestCase):
             outputs = {}
             for profile in PROFILES:
                 for scheme in (*SCHEMES, *CONTROLS):
-                    if scheme == "hixl":
+                    if scheme == "roce":
                         continue
                     options = argparse.Namespace(
                         corpus=temp, scheme=scheme, profile=profile, device="cpu",

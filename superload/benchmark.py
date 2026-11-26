@@ -9,12 +9,12 @@ from statistics import median
 
 from .corpus import interleave, make_plan, open_corpus, page_bytes, page_extents, read_spans
 from .device import Ascend, CPU, HostBuffer
-from .hixl import HixlSource
 from .policies import HostCache
+from .roce import RoceSource
 from .workloads import make_trace
 
 
-SCHEMES = ("native", "hixl", "strata", "bidaw", "solid")
+SCHEMES = ("native", "roce", "strata", "bidaw", "solid")
 CONTROLS = ("native-lru", "strata-io", "solid-io")
 
 
@@ -205,15 +205,14 @@ def run(args, spec, seed):
     layout = {
         "strata": "page-first", "strata-io": "page-first", "solid": "interleaved", "solid-io": "interleaved",
     }.get(args.scheme, "layer-major")
-    use_hixl = args.scheme == "hixl"
-    if use_hixl and args.device == "cpu":
-        raise ValueError("HIXL requires an Ascend device")
+    use_roce = args.scheme == "roce"
     with ExitStack() as stack:
         device = stack.enter_context(CPU() if args.device == "cpu" else Ascend(int(args.device)))
         base = stack.enter_context(device.allocate(length))
         pool = None
-        if use_hixl:
-            loader = stack.enter_context(HixlSource(args, spec, seed, base, length))
+        if use_roce:
+            request_pages = max(len(req.pages) for wave in trace for req in wave.requests)
+            loader = stack.enter_context(RoceSource(args, spec, seed, device, request_pages))
         else:
             stager = HostBuffer(length)
             stack.callback(stager.close)

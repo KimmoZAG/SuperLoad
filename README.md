@@ -4,6 +4,8 @@ Ascend 910B2 上的 KV Cache 存储加载基准。两种确定性负载分别模
 
 [在线实验报告](https://kimmozag.github.io/SuperLoad/) · [实验方法与论文复现范围](docs/experiment.md) · [RoCE 运行说明](docs/roce.md) · [原始测量](https://github.com/KimmoZAG/SuperLoad/releases/tag/results-ascend-910b2-2026-11-26)
 
+[混合负载结果](https://kimmozag.github.io/SuperLoad/#mixed-workloads) 并列展示 LRU、Strata、Bidaw 和 SolidAttention 的前缀及稀疏回载 P95。分轮汇总记录在 [mixed-results.csv](report/mixed-results.csv)。
+
 ## 快速运行
 
 在 Linux 下用 Python 3.10+。真实 HBM 测量需要 Ascend 驱动和 CANN。
@@ -78,6 +80,7 @@ tests/                    负载、缓存策略和回放测试
 docs/                     论文机制映射、指标与 RoCE 运行步骤
 report/
   build.py / figures.py    读取结果并生成网页和矢量图
+  mixed.py / mixed-results.csv  混合负载的表格生成与分轮指标
   results-release.json    固定数据发布版本及 SHA-256
   static/                 网页模板、样式和交互
 .github/workflows/        Python 测试及 GitHub Pages 部署

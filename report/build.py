@@ -8,6 +8,7 @@ import shutil
 from pathlib import Path
 from statistics import median
 
+import mixed
 from figures import render, stage_values
 from release_data import ResultsRelease
 
@@ -15,6 +16,7 @@ from release_data import ResultsRelease
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 STATIC = HERE / "static"
+MIXED_RESULTS = HERE / "mixed-results.csv"
 NAMES = {
     "native": "原生加载", "roce": "RoCE RC", "strata": "Strata", "bidaw": "Bidaw",
     "solid": "SolidAttention", "native-lru": "原生 + LRU", "strata-io": "Strata 仅布局",
@@ -222,11 +224,13 @@ def main():
             matrix = load(directory)
     else:
         matrix = load(args.results)
+    mixed_runs = mixed.load(MIXED_RESULTS)
     render(matrix, args.output / "figures")
     static = args.output / "assets"
     static.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(STATIC / "style.css", static / "style.css")
     shutil.copyfile(STATIC / "report.js", static / "report.js")
+    shutil.copyfile(MIXED_RESULTS, static / "mixed-results.csv")
     output = {"schema": 1, "runs": []}
     if release is not None:
         output["results_release"] = {"tag": release.tag, "url": release.page_url, "sha256": release.sha256}
@@ -251,6 +255,7 @@ def main():
     ))
     raw_link = f' · <a href="{html.escape(release.page_url)}">原始样本（Release）</a>' if release else ""
     report = (template.replace("@@RESULTS@@", panels(matrix)).replace("@@INSIGHTS@@", insights(matrix))
+              .replace("@@MIXED_RESULTS@@", mixed.panels(mixed_runs))
               .replace("@@FIGURES@@", detail).replace("@@RESULTS_RELEASE@@", raw_link))
     (args.output / "index.html").write_text(report, encoding="utf-8")
     print(f"Built {args.output / 'index.html'} and vector figures from {len(matrix)} measured cells")

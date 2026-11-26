@@ -35,3 +35,11 @@
 ## 环境与解释
 
 单张 Ascend 910B2 64 GiB、openEuler 24.03 LTS SP3/aarch64、CANN 9.1.0、Ascend driver 26.0.rc1。实验语料位于 Longhorn ext4 工作区卷。每个方案进程串行执行并复用同一设备。进程启动、HBM 分配和字节校验在计时之外。本项目测量读路径。模型服务端的 TTFT、TPOT、质量和写回开销留待完整复现实验。Buffered 与 direct 两组分别解读。RoCE 测量使用同一 mlx5 端口的两个 RC 端点，另记录传输和缓冲整理耗时。 [RoCE 运行说明](roce.md)
+
+## 混合负载对照
+
+单张 910B2 上，两类回载任务独立到达，共用从 Longhorn ext4 文件经主机 DRAM 到 HBM 的本地加载路径。两个负载使用互不重叠的页 ID。常规混跑每轮有 6 批前缀任务（每批 4 个）和 18 个稀疏任务，分别测 Buffered 和 Direct I/O。稀疏占优每轮有 3 批前缀任务和 24 个稀疏任务，测 Buffered。名义逻辑输入为 0.28 GiB/s。
+
+四个方案共用 128 MiB 按需中转窗口和 4 GiB HBM 回读空间。LRU 和 Bidaw 的主机缓存均为 24 页（48 MiB）。LRU 按 FIFO 取数，Strata 使用 page-first 布局和同批前缀去重，Bidaw 使用缓存感知排序及回复长度辅助淘汰，SolidAttention 使用 K/V 交织布局和基于同会话上一步的预取。这些配置在 SuperLoad 中执行，测量范围从任务到达到 KV 页在 HBM 就绪。
+
+同一测试条件下，四个方案对齐种子 42、43、44 各自的到达序列。每轮分别计算两类任务的 P95，表中取各轮中位数。逻辑吞吐按整轮统计。参见 [分轮指标](../report/mixed-results.csv) 和 [在线结果](https://kimmozag.github.io/SuperLoad/#mixed-workloads)。

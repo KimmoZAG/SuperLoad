@@ -168,16 +168,6 @@ def render(summary, measurements, output):
 
 
 def panel(summary, release_url, figure):
-    primary = next(s for s in summary["sweep"] if s["capacity_gib"] == summary["primary_gib"]
-                   and s["order_seed"] == summary["primary_order_seed"])
-    buffered = summary["measurements"]["buffered"]
-    direct = summary["measurements"]["direct"]
-    stages = buffered["large_first_stage_median_ms"]
-    direct_stages = direct["large_first_stage_median_ms"]
-
-    def small(case):
-        return buffered["cases"][case]["small_ready_p95_ms"]["median"]
-
     lines = []
     for mode in ("direct", "buffered"):
         for case, (label, *_) in CASES.items():
@@ -194,24 +184,7 @@ def panel(summary, release_url, figure):
     ))
     link = f' · <a href="{html.escape(release_url)}">原始测量（Release）</a>' if release_url else ""
     return (
-        f'<p class="blurb">回放 {summary["requests"]:,} 条线上工具调用与 Agent 请求。'
-        f'在 8 / 16 / 64 GiB 的 HBM / DRAM / 存储配置下，预热后有 '
-        f'{primary["mixed_windows"]} / {primary["windows"]} 个时间窗同时出现小回载和大回载'
-        f'（{primary["mixed_windows"] / primary["windows"]:.1%}）。小回载为 8–32 MiB，大回载至少 128 MiB。'
-        f'以模型判定的存储命中和上两层未命中确定回载块。</p>'
-        f'<p class="blurb">从共现窗随机抽取 {summary["pairs"]} 对读取块互不重叠的回载。910B2 的 '
-        f'Buffered 每轮 {buffered["pairs"]} 对，共 {buffered["repeat"]} 轮。'
-        f'小回载单独、先执行、排在大回载后、晚到 25 ms 的 P95 '
-        f'分别为 {small("small-only"):.2f}、{small("small-first"):.2f}、'
-        f'{small("large-first"):.2f}、{small("large-first-25ms"):.2f} ms。'
-        f'Direct I/O 复测抽取其中 {direct["pairs"]} 对，共 {direct["repeat"]} 轮。</p>'
-        f'<p class="blurb">Buffered 的大回载先执行时，'
-        f'{buffered["small_delayed_by_large"]} / {buffered["samples"]} 次小回载比单跑更慢。'
-        f'排在前面的大回载，其文件读取中位数为 {stages["file_read"]:.2f} ms，'
-        f'同步 H2D 调用中位数为 {stages["h2d"]:.2f} ms。Direct I/O 中这两段分别为 '
-        f'{direct_stages["file_read"]:.2f} 和 {direct_stages["h2d"]:.2f} ms。'
-        '两种 I/O 模式下，小回载都需等大回载完成，主要占用阶段随 I/O 模式变化。</p>'
-        + figure("tool-agent-prefix", "Agent 前缀回载共现率与小回载就绪延迟",
+        figure("tool-agent-prefix", "Agent 前缀回载共现率与小回载就绪延迟",
                  "A 为同窗共现比例，菱形是三种组内顺序的中位数，横线是范围。B、C 汇集各轮的小回载样本，"
                  "共用对数时延轴。95% 参考线对应合并分布，表中 P95 为各轮 P95 的中位数。")
         + '<div class="table-wrap" role="region" aria-label="Agent 前缀回载配对测量" tabindex="0">'

@@ -96,7 +96,7 @@ def main():
     compare_plan, compare_runs, compare_release = load(
         comparison, "comparison-results-release.json", args.comparison_results,
     )
-    ablation_run, page_bytes, ablation_release = load(
+    ablation_run, page_bytes, _ = load(
         direct_ablation, "direct-ablation-results-release.json", args.direct_ablation_results,
     )
     summary = prefix.summarize(plan, runs)
@@ -122,11 +122,6 @@ def main():
     if "buffered-pinned" in compare_summary["measurements"]:
         description += "。包含 Buffered I/O 普通缓冲、Direct I/O 和 Buffered I/O 锁页缓冲。"
     charts = arrival_figures(figures, "method-comparison", description)
-    ablation_charts = arrival_figures(
-        figures, "direct-io-ablation",
-        "Direct I/O 下普通主机缓冲和 CANN 锁页路径的三种调度方法。"
-        "对照 8–32 MiB 与 ≥128 MiB 的 HBM 就绪 P95 和双请求吞吐。",
-    )
     prefix_chart = figure(figures, "tool-agent-prefix", "两组请求的共现率与低回载量组就绪延迟")
     overview = render_overview((ROOT / "overview.md").read_text(encoding="utf-8"))
     report = (template.replace("@@POSTER_RESULTS@@", render_poster_results(compare_summary))
@@ -135,8 +130,6 @@ def main():
               .replace("@@LOW_RELOAD_RANGE@@", LOW_RELOAD_RANGE)
               .replace("@@HIGH_RELOAD_RANGE@@", HIGH_RELOAD_RANGE)
               .replace("@@COMPARISON@@", charts)
-              .replace("@@DIRECT_ABLATION@@", ablation_charts)
-              .replace("@@DIRECT_ABLATION_DOWNLOAD@@", download_link(ablation_release, "补测原始 ZIP"))
               .replace("@@PREFIX_DOWNLOAD@@", download_link(release, "问题验证原始 ZIP"))
               .replace("@@COMPARISON_DOWNLOAD@@", download_link(compare_release, "对照原始 ZIP")))
     (args.output / "index.html").write_text(report, encoding="utf-8")

@@ -1,6 +1,6 @@
 # Direct I/O 分块与锁页对照
 
-在同一条 910B2 存储到 HBM 通路上，对照整请求与 16 MiB 分块的传输开销、块间轮转的调度效果，以及主机缓冲路径的影响。[在线结果](https://kimmozag.github.io/SuperLoad/#direct-io-ablation)
+在同一条 910B2 存储到 HBM 通路上，对照整请求与 16 MiB 分块的传输开销、块间轮转的调度效果，以及主机缓冲路径的影响。
 
 ## 实验设置
 

@@ -70,6 +70,7 @@ figcaption { display: flex; align-items: start; justify-content: space-between; 
 .figure-downloads { display: inline-flex; gap: .65rem; font-weight: 680; flex-shrink: 0; }
 .mobile-scroll-note { display: none; }
 .profile .paper-figure { margin-bottom: 1rem; }
+.mixed-downloads { display: flex; flex-wrap: wrap; gap: .25rem .9rem; }
 .mixed-charts { padding: clamp(.75rem, 2.1vw, 1.45rem); background: var(--surface); border: 1px solid var(--line); border-radius: .7rem; }
 .mixed-legend { display: flex; align-items: center; flex-wrap: wrap; gap: .35rem 1.2rem; padding: .2rem .2rem 1rem; color: var(--muted); font-size: .89rem; }
 .mixed-legend b { color: var(--ink); margin-right: .17rem; }

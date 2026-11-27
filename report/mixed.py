@@ -159,13 +159,13 @@ def joint_dashboard(runs):
     sections = []
     for name, title, _, _ in CHARTS:
         panels_html = []
-        for mode, scenario in JOINT_COMPARISONS:
+        for mode in JOINT_RATES:
             label = MODES[mode]
-            _, rate = JOINT_COMPARISONS[mode, scenario]
+            rate = f"<span>输入 {JOINT_RATES[mode]:.2f} GiB/s</span>" if name == "prefix" else ""
             alt = html.escape(f"{label} 的五方案{title}。联合切分在图中标为 Joint scheduling。")
             panels_html.append(
                 '<figure class="mixed-chart">'
-                f'<h4>{label}<span>{rate.rstrip("。")}</span></h4>'
+                f'<h4>{label}{rate}</h4>'
                 f'<img src="figures/mixed-{name}-{mode}.svg" alt="{alt}" decoding="async">'
                 '</figure>'
             )
@@ -177,12 +177,12 @@ def joint_dashboard(runs):
     return (
         '<div class="mixed-charts">'
         '<div class="mixed-legend" aria-label="图例">'
-        '<span><b aria-hidden="true">◆</b> 三轮中位数</span>'
-        '<span><b aria-hidden="true">○</b> 单轮结果</span>'
-        '<span><b aria-hidden="true">━</b> 延迟实测范围</span>'
+        '<span><b aria-hidden="true">◆</b> 中位数</span>'
+        '<span><b aria-hidden="true">○</b> 单轮</span>'
+        '<span><b aria-hidden="true">━</b> 延迟范围</span>'
         '<span class="mixed-joint-label">联合切分（Joint scheduling）</span></div>'
         + "".join(sections)
-        + '</div><details class="mixed-details"><summary>展开五方案数值表</summary>'
+        + '</div><details class="mixed-details"><summary>数值表</summary>'
         + panels(runs, JOINT_COMPARISONS, JOINT_SCHEMES)
         + '</details>'
     )

@@ -51,17 +51,15 @@
 
       <section id="mixed-workloads" aria-labelledby="mixed-workloads-title">
         <div class="section-top">
-          <div>
-            <h2 id="mixed-workloads-title">混合负载实测</h2>
-            <p>联合切分与 LRU、Strata、Bidaw、SolidAttention 在同一台 910B2 上对比。每轮有 48 个前缀任务和 36 个稀疏任务，五个方案使用相同的到达时刻和页 ID。</p>
+          <h2 id="mixed-workloads-title">混合负载实测</h2>
+          <div class="mixed-downloads">
+            <a class="text-link" href="assets/joint-mixed-trials.csv" download>分轮 CSV</a>
+            <a class="text-link" href="https://github.com/KimmoZAG/SuperLoad/tree/main/report/results/joint-four-baselines">原始数据</a>
           </div>
-          <a class="text-link" href="assets/joint-mixed-trials.csv" download>下载分轮 CSV</a>
         </div>
         @@JOINT_RESULTS@@
-        <p class="sample">联合切分按每个请求的缺页集合决定文件读取和 H2D 的切点，同批前缀共享页只读、只搬一次。</p>
-        <p class="sample">P95 从任务到达计到所需 KV 页全部进入 HBM，横轴使用对数刻度。逻辑吞吐按整轮统计。Buffered 预热 Linux 页缓存，Direct I/O 绕过读取端页缓存。<a href="https://github.com/KimmoZAG/SuperLoad/tree/main/report/results/joint-four-baselines">原始记录与复跑命令</a></p>
         <details class="mixed-details">
-          <summary>查看早期四方案对照（0.28 GiB/s）</summary>
+          <summary>早期四方案（0.28 GiB/s）</summary>
           @@MIXED_RESULTS@@
           <p class="sample"><a href="assets/mixed-results.csv" download>下载早期分轮 CSV</a></p>
         </details>

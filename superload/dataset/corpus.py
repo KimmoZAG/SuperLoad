@@ -6,10 +6,10 @@ import os
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from .workloads import Geometry, PAGE_COUNT
+from .geometry import Geometry
 
 
-LAYOUTS = ("layer-major", "page-first", "interleaved")
+LAYOUTS = ("layer-major", "page-first")
 
 
 @dataclass(frozen=True)
@@ -24,23 +24,7 @@ def page_bytes(seed, page, size):
     return hashlib.shake_256(key).digest(size)
 
 
-def interleave(spec, page):
-    """Turn each plane pair from [K tokens][V tokens] into [K0,V0,K1,V1,...]."""
-    plane = spec.plane_bytes
-    vector = spec.vector_bytes
-    result = bytearray(len(page))
-    for layer in range(spec.layers):
-        k = 2 * layer * plane
-        v = k + plane
-        for token in range(spec.tokens):
-            src = token * vector
-            dst = k + 2 * src
-            result[dst:dst + vector] = page[k + src:k + src + vector]
-            result[dst + vector:dst + 2 * vector] = page[v + src:v + src + vector]
-    return result
-
-
-def page_extents(layout, spec, page, target=0, page_count=PAGE_COUNT):
+def page_extents(layout, spec, page, target, page_count):
     plane = spec.plane_bytes
     if layout == "page-first":
         return [Extent(page * spec.page_bytes, target, spec.page_bytes)]
@@ -49,16 +33,10 @@ def page_extents(layout, spec, page, target=0, page_count=PAGE_COUNT):
             Extent((i * page_count + page) * plane, target + i * plane, plane)
             for i in range(spec.layers * 2)
         ]
-    if layout == "interleaved":
-        span = 2 * plane
-        return [
-            Extent((i * page_count + page) * span, target + i * span, span)
-            for i in range(spec.layers)
-        ]
     raise ValueError(f"unknown layout: {layout}")
 
 
-def make_plan(layout, spec, pages, page_count=PAGE_COUNT):
+def make_plan(layout, spec, pages, page_count):
     spans = []
     for i, page in enumerate(pages):
         for current in page_extents(layout, spec, page, i * spec.page_bytes, page_count):
@@ -81,7 +59,7 @@ def write_at(fd, data, offset):
         view = view[count:]
 
 
-def generate(directory, spec, seed, *, page_count=PAGE_COUNT, layouts=LAYOUTS):
+def generate(directory, spec, seed, *, page_count, layouts=LAYOUTS):
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
     manifest = directory / "manifest.json"
@@ -94,9 +72,8 @@ def generate(directory, spec, seed, *, page_count=PAGE_COUNT, layouts=LAYOUTS):
         for page in range(page_count):
             canonical = page_bytes(seed, page, spec.page_bytes)
             for name, handle in files.items():
-                payload = interleave(spec, canonical) if name == "interleaved" else canonical
-                for extent in page_extents(name, spec, page, page_count=page_count):
-                    write_at(handle.fileno(), payload[extent.target:extent.target + extent.size], extent.offset)
+                for extent in page_extents(name, spec, page, 0, page_count):
+                    write_at(handle.fileno(), canonical[extent.target:extent.target + extent.size], extent.offset)
         for handle in files.values():
             os.fsync(handle.fileno())
     except BaseException:
@@ -117,7 +94,7 @@ def read_manifest(directory):
     return Geometry(**manifest["geometry"]), int(manifest["seed"])
 
 
-def open_corpus(directory, layout, spec, mode, *, page_count=PAGE_COUNT):
+def open_corpus(directory, layout, spec, mode, *, page_count):
     path = Path(directory) / f"{layout}.bin"
     flags = os.O_RDONLY
     if mode == "direct":

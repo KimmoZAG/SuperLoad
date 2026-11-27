@@ -7,7 +7,7 @@ from collections import Counter, OrderedDict
 from itertools import groupby
 from pathlib import Path
 
-from .workloads import Geometry
+from .geometry import Geometry
 
 
 TRACE_URL = (
@@ -23,7 +23,7 @@ SMALL_MAX = 4
 LARGE_MIN = 16
 
 
-def replay(windows, capacities, warmup, seed):
+def replay(windows, capacities, warmup, seed, audit_sharing=False):
     """Read each timestamp against a common residency snapshot, then commit touches."""
     rng = random.Random(seed)
     tiers = [OrderedDict() for _ in capacities]
@@ -64,12 +64,17 @@ def replay(windows, capacities, warmup, seed):
         disjoint = [(s, l) for s in small for l in large if set(s).isdisjoint(l)]
         if disjoint:
             candidates.append((timestamp, disjoint))
+        if audit_sharing:
+            active = [set(pages) for pages in reloads if pages]
+            counts["shared_storage_windows"] += int(any(
+                not a.isdisjoint(b) for i, a in enumerate(active) for b in active[i + 1:]
+            ))
     counts["storage_requests"] = counts["requests"] - histogram[0]
     counts["disjoint_windows"] = len(candidates)
     return dict(counts), dict(sorted(histogram.items())), candidates
 
 
-def build_plan(trace, sample, warmup, seed):
+def read_trace(trace, warmup):
     payload = Path(trace).read_bytes()
     digest = hashlib.sha256(payload).hexdigest()
     if digest != TRACE_SHA256:
@@ -81,7 +86,11 @@ def build_plan(trace, sample, warmup, seed):
     ]
     if not 0 <= warmup < len(windows):
         raise ValueError("warmup must leave at least one measurement window")
+    return digest, len(rows), windows
 
+
+def build_plan(trace, sample, warmup, seed):
+    digest, request_count, windows = read_trace(trace, warmup)
     sweep = []
     for gib in CAPACITIES:
         blocks = tuple(value * (1 << 30) // GEOMETRY.page_bytes for value in gib)
@@ -103,7 +112,7 @@ def build_plan(trace, sample, warmup, seed):
     page_ids = sorted({page for _, small, large in chosen for page in (*small, *large)})
     indices = {page: index for index, page in enumerate(page_ids)}
     return {
-        "schema": 1, "trace_sha256": digest, "trace_url": TRACE_URL, "requests": len(rows),
+        "schema": 1, "trace_sha256": digest, "trace_url": TRACE_URL, "requests": request_count,
         "source_windows": len(windows), "warmup_windows": warmup, "page_bytes": GEOMETRY.page_bytes,
         "small_max_blocks": SMALL_MAX, "large_min_blocks": LARGE_MIN, "sample_seed": seed,
         "primary_gib": PRIMARY, "primary_order_seed": ORDER_SEEDS[0], "sweep": sweep,
@@ -112,5 +121,28 @@ def build_plan(trace, sample, warmup, seed):
             {"timestamp_ms": timestamp, "small": [indices[page] for page in small],
              "large": [indices[page] for page in large]}
             for timestamp, small, large in chosen
+        ],
+    }
+
+
+def build_comparison(trace, sample, warmup, seed):
+    digest, request_count, windows = read_trace(trace, warmup)
+    capacities = tuple(gib * (1 << 30) // GEOMETRY.page_bytes for gib in PRIMARY)
+    counts, _, disjoint = replay(windows, capacities, warmup, ORDER_SEEDS[0], audit_sharing=True)
+    rng = random.Random(seed)
+    sampled = [(t, *rng.choice(pairs)) for t, pairs in sorted(rng.sample(disjoint, min(sample, len(disjoint))))]
+    pages = sorted({page for _, small, large in sampled for page in (*small, *large)})
+    indices = {page: index for index, page in enumerate(pages)}
+    return {
+        "schema": 1, "workload": "tool-agent-comparison", "trace_sha256": digest,
+        "trace_url": TRACE_URL, "requests": request_count, "source_windows": len(windows),
+        "warmup_windows": warmup, "capacity_gib": PRIMARY, "order_seed": ORDER_SEEDS[0],
+        "sample_seed": seed, "disjoint_windows": counts["disjoint_windows"],
+        "shared_storage_windows": counts["shared_storage_windows"],
+        "page_bytes": GEOMETRY.page_bytes, "file_page_hashes": pages,
+        "pairs": [
+            {"timestamp_ms": t, "small": [indices[p] for p in small],
+             "large": [indices[p] for p in large]}
+            for t, small, large in sampled
         ],
     }

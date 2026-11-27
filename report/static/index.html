@@ -3,10 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="SuperLoad 在昇腾 910B2 上的 KV Cache 回载实验图表。">
-  <title>SuperLoad · KV Cache 回载实验</title>
+  <meta name="description" content="昇腾 910B2 上的 Agent 前缀 KV 回载争用和加载方法对照。">
+  <title>SuperLoad · Agent 前缀 KV 回载</title>
   <link rel="stylesheet" href="assets/style.css">
-  <script defer src="assets/report.js"></script>
 </head>
 <body>
   <a class="skip" href="#main">跳到内容</a>
@@ -14,46 +13,32 @@
     <div class="frame top-inner">
       <a class="wordmark" href="./"><span class="mark" aria-hidden="true"></span>SuperLoad</a>
       <nav aria-label="报告导航">
-        <a href="#prefix-contention">Agent 前缀</a>
-        <a href="#mixed-workloads">混合负载</a>
-        <a href="#mechanism-archive">其他实验</a>
+        <a href="#comparison">方法对照</a>
+        <a href="#prefix-contention">问题验证</a>
       </nav>
       <a class="repo" href="https://github.com/KimmoZAG/SuperLoad">GitHub</a>
     </div>
   </header>
-  <main id="main">
-    <div class="frame body">
-      <h1>KV Cache 回载实验</h1>
-
-      <section id="prefix-contention" aria-labelledby="prefix-title">
-        <h2 id="prefix-title">Agent 前缀回载</h2>
-        @@PREFIX_RESULTS@@
-      </section>
-
-      <section id="mixed-workloads" aria-labelledby="mixed-workloads-title">
-        <h2 id="mixed-workloads-title">混合负载</h2>
-        @@JOINT_RESULTS@@
-      </section>
-
-      <section id="mechanism-archive" aria-labelledby="archive-title">
-        <h2 id="archive-title">其他实验</h2>
-        <details data-archive>
-          <summary>展开图表</summary>
-          <section id="results" aria-labelledby="results-title">
-            <h3 id="results-title">单类负载</h3>
-            <div class="tabs" data-switch hidden aria-label="负载选择">
-              <button type="button" data-target="interactive-prefix" aria-pressed="true">多轮对话前缀</button>
-              <button type="button" data-target="sparse-decode" aria-pressed="false">稀疏解码</button>
-            </div>
-            @@RESULTS@@
-          </section>
-          <section id="distributions" aria-labelledby="distributions-title">
-            <h3 id="distributions-title">时延分布与机制消融</h3>
-            <div class="figure-stack">@@FIGURES@@</div>
-          </section>
-        </details>
-      </section>
-    </div>
+  <main id="main" class="frame body">
+    <h1>Agent 前缀 KV 回载</h1>
+    <section id="comparison" aria-labelledby="comparison-title">
+      <h2 id="comparison-title">五种方法实测</h2>
+      <div class="figure-stack">@@COMPARISON@@</div>
+      <div class="resources">
+        <a href="assets/comparison-summary.json" download>对照汇总 JSON</a>
+        <a href="@@COMPARISON_RELEASE@@">对照原始数据</a>
+        <a href="https://github.com/KimmoZAG/SuperLoad/blob/main/docs/comparison.md">设置与结果解读</a>
+      </div>
+    </section>
+    <section id="prefix-contention" aria-labelledby="prefix-title">
+      <h2 id="prefix-title">队首阻塞与负载依据</h2>
+      @@PREFIX_RESULTS@@
+      <div class="resources">
+        <a href="assets/prefix-summary.json" download>问题验证汇总 JSON</a>
+        <a href="@@PREFIX_RELEASE@@">问题验证原始数据</a>
+        <a href="https://github.com/KimmoZAG/SuperLoad/blob/main/docs/prefix-reload.md">回放与实测方法</a>
+      </div>
+    </section>
   </main>
 </body>
 </html>

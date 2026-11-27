@@ -29,4 +29,14 @@ Buffered 每对先预读以观察热文件数据，运行 64 对、三轮。Dire
 
 ## 复现
 
-从 [仓库说明](../README.md#快速运行) 运行 `prefix-plan` 和 `prefix-bench`。网页的 SVG、PDF 和汇总 JSON 由 [报告构建](../report/build.py) 从固定 Release 的数据生成。原始逐对、逐条件测量在 [实验数据 Release](https://github.com/KimmoZAG/SuperLoad/releases/tag/results-prefix-910b2-2026-11-27)。
+下载轨迹并启用 AscendCL 后运行以下命令。下载与环境命令见 [仓库说明](../README.md#运行方法对照)。
+
+```bash
+python3 -m superload prefix-plan --trace data/toolagent_trace.jsonl --output runs/prefix/plan.json
+python3 -m superload prefix-bench --plan runs/prefix/plan.json --corpus data/prefix \
+  --io buffered --storage-label longhorn-ext4 --output runs/prefix/buffered.json
+python3 -m superload prefix-bench --plan runs/prefix/plan.json --corpus data/prefix \
+  --io direct --repeat 2 --pair-limit 16 --storage-label longhorn-ext4 --output runs/prefix/direct.json
+```
+
+网页图表由 [报告构建](../report/build.py) 从固定附件生成。[实验数据 Release](https://github.com/KimmoZAG/SuperLoad/releases/tag/results-prefix-910b2-2026-11-27)

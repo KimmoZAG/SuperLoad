@@ -120,7 +120,15 @@ h3 { font-size: 1.15rem; margin-bottom: .5rem; }
 }
 .poster-tradeoffs dt { color: #c4dbd4; font-size: .77rem; }
 .poster-tradeoffs dd { margin: .13rem 0 0; font-size: clamp(.87rem, 1.4vw, 1rem); font-weight: 670; }
-.result-context { color: #bfe6d6; font-size: .755rem; text-underline-offset: .2em; }
+.result-context { margin: 0; color: #bfe6d6; font-size: .755rem; }
+.result-link {
+  display: inline-block;
+  margin-top: .28rem;
+  color: var(--mint);
+  font-size: .85rem;
+  font-weight: 650;
+  text-underline-offset: .2em;
+}
 
 .poster-evidence { margin-top: clamp(.75rem, 2.1vw, 1.45rem); }
 .poster-flow, .poster-motivation {

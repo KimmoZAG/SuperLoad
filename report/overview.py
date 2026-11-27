@@ -64,6 +64,7 @@ def render_poster_results(summary):
         f'<div><dt>高回载量请求 P95</dt><dd>{large_before:.2f} → {large_after:.2f} <small>s</small></dd></div>'
         f'<div><dt>双请求吞吐</dt><dd>{throughput_before:.3f} → {throughput_after:.3f} '
         '<small>GiB/s</small></dd></div></dl>'
-        '<a class="result-context" href="#comparison">Direct I/O · 高回载量请求早到 25 ms · '
-        f'{direct["pairs"]} 对 × {direct["repeat"]} 轮</a></section>'
+        '<p class="result-context">Direct I/O · 高回载量请求早到 25 ms · '
+        f'{direct["pairs"]} 对 × {direct["repeat"]} 轮</p>'
+        '<a class="result-link" href="#comparison">查看实测图 <span aria-hidden="true">↓</span></a></section>'
     )

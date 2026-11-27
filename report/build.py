@@ -4,6 +4,7 @@ import argparse
 import html
 import json
 import shutil
+from base64 import b64encode
 from pathlib import Path
 
 import comparison
@@ -28,12 +29,19 @@ RETIRED_MIXED_CHARTS = tuple(
 )
 
 
-def figure(name, alt):
+def svg_data_url(path):
+    return "data:image/svg+xml;base64," + b64encode(path.read_bytes()).decode("ascii")
+
+
+def figure(directory, name, alt):
     label = html.escape(alt)
+    # Keep the report readable even when individual figure requests fail.
+    desktop = svg_data_url(directory / f"{name}.svg")
+    mobile = svg_data_url(directory / f"{name}-mobile.svg")
     return (
         '<figure class="paper-figure"><picture>'
-        f'<source media="(max-width: 48rem)" srcset="figures/{name}-mobile.svg">'
-        f'<img src="figures/{name}.svg" alt="{label}" decoding="async"></picture>'
+        f'<source media="(max-width: 48rem)" srcset="{mobile}">'
+        f'<img src="{desktop}" alt="{label}" decoding="async"></picture>'
         f'<figcaption><a href="figures/{name}.svg" aria-label="{label} SVG">SVG</a>'
         f'<a href="figures/{name}.pdf" aria-label="{label} PDF">PDF</a></figcaption></figure>'
     )
@@ -93,14 +101,18 @@ def main():
     template = (STATIC / "index.html").read_text(encoding="utf-8")
     charts = "".join(
         f'<article><h3>{comparison.GAPS[gap]}</h3>'
-        + figure(f"method-comparison-{gap}ms", f"{comparison.GAPS[gap]}时五种方法的对照，延迟越低越好，吞吐越高越好")
+        + figure(
+            figures, f"method-comparison-{gap}ms",
+            f"{comparison.GAPS[gap]} · 五种方法对照，延迟越低越好，吞吐越高越好",
+        )
         + '</article>'
         for gap in (25, 0)
     )
+    prefix_chart = figure(figures, "tool-agent-prefix", "两组请求的共现率与低回载量组就绪延迟")
     overview = render_overview((ROOT / "overview.md").read_text(encoding="utf-8"))
     report = (template.replace("@@POSTER_RESULTS@@", render_poster_results(compare_summary))
               .replace("@@OVERVIEW@@", overview)
-              .replace("@@PREFIX_RESULTS@@", figure("tool-agent-prefix", "两组请求的共现率与低回载量组就绪延迟"))
+              .replace("@@PREFIX_RESULTS@@", prefix_chart)
               .replace("@@LOW_RELOAD_RANGE@@", LOW_RELOAD_RANGE)
               .replace("@@HIGH_RELOAD_RANGE@@", HIGH_RELOAD_RANGE)
               .replace("@@COMPARISON@@", charts)

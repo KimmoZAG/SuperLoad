@@ -1,7 +1,6 @@
 """Validate and present the Agent prefix contention study."""
 
 import hashlib
-import html
 import json
 import math
 from collections import defaultdict
@@ -14,10 +13,10 @@ from figures import MODES, panel_title, save
 
 
 CASES = {
-    "small-only": ("小回载单独执行", "Small alone", "#505963", "-"),
-    "small-first": ("小回载先执行", "Small first", "#0072B2", "--"),
-    "large-first": ("大回载先执行", "Large first", "#C34E00", "-"),
-    "large-first-25ms": ("大回载早到 25 ms", "Large arrives 25 ms earlier", "#008463", "-."),
+    "small-only": ("Small alone", "#505963", "-"),
+    "small-first": ("Small first", "#0072B2", "--"),
+    "large-first": ("Large first", "#C34E00", "-"),
+    "large-first-25ms": ("Large arrives 25 ms earlier", "#008463", "-."),
 }
 
 
@@ -117,8 +116,17 @@ def summarize(plan, measurements):
 
 def render(summary, measurements, output):
     output.mkdir(parents=True, exist_ok=True)
-    fig, axes = plt.subplots(1, 3, figsize=(11.8, 4.45))
-    fig.subplots_adjust(left=0.095, right=0.98, top=0.85, bottom=0.22, wspace=0.32)
+    render_layout(summary, measurements, output, mobile=False)
+    render_layout(summary, measurements, output, mobile=True)
+
+
+def render_layout(summary, measurements, output, *, mobile):
+    if mobile:
+        fig, axes = plt.subplots(3, 1, figsize=(5.0, 9.6))
+        fig.subplots_adjust(left=0.18, right=0.96, top=0.945, bottom=0.13, hspace=0.57)
+    else:
+        fig, axes = plt.subplots(1, 3, figsize=(11.8, 4.45))
+        fig.subplots_adjust(left=0.095, right=0.98, top=0.85, bottom=0.22, wspace=0.32)
     sweep = defaultdict(list)
     for row in summary["sweep"]:
         sweep[tuple(row["capacity_gib"])].append(row["mixed_windows"] / row["windows"])
@@ -146,7 +154,7 @@ def render(summary, measurements, output):
     all_samples = [x for cases in samples_by_mode.values() for values in cases.values() for x in values]
     for axis, letter, mode in zip(axes[1:], "BC", samples_by_mode):
         panel_title(axis, letter, MODES[mode])
-        for case, (_, label, color, linestyle) in CASES.items():
+        for case, (label, color, linestyle) in CASES.items():
             values = samples_by_mode[mode][case]
             axis.step(values, [(i + 1) / len(values) for i in range(len(values))],
                       where="post", label=label, color=color, linestyle=linestyle, linewidth=1.65)
@@ -162,37 +170,10 @@ def render(summary, measurements, output):
         axis.set_xlabel("Small reload ready (ms, log)")
         axis.grid(axis="y")
     axes[1].set_ylabel("Empirical CDF")
-    fig.legend(*axes[1].get_legend_handles_labels(), loc="lower center", bbox_to_anchor=(0.55, 0.035),
-               frameon=False, ncol=4, fontsize=9)
-    save(fig, output, "tool-agent-prefix")
-
-
-def panel(summary, release_url, figure):
-    lines = []
-    for mode in ("direct", "buffered"):
-        for case, (label, *_) in CASES.items():
-            metrics = summary["measurements"][mode]["cases"][case]
-            keys = ("small_ready_p95_ms", "small_queue_p95_ms", "paired_small_delta_median_ms",
-                    "large_ready_p95_ms", "pair_gib_s")
-            values = "".join(
-                f'<td>{metrics[key]["median"]:.2f}</td>' if key in metrics else "<td>—</td>" for key in keys
-            )
-            lines.append(f'<tr><th scope="row">{MODES[mode]} · {label}</th>{values}</tr>')
-    headers = "".join(f'<th scope="col">{label}</th>' for label in (
-        "配对条件", "小回载 P95（ms）", "小回载排队 P95（ms）", "小回载配对增量中位数（ms）",
-        "大回载 P95（ms）", "双请求吞吐（GiB/s）",
-    ))
-    link = f' · <a href="{html.escape(release_url)}">原始测量（Release）</a>' if release_url else ""
-    return (
-        figure("tool-agent-prefix", "Agent 前缀回载共现率与小回载就绪延迟",
-                 "A 为大小回载的同窗共现率，B、C 为两种 I/O 模式下的小回载就绪延迟分布。",
-                 show_scroll_note=False)
-        + '<div class="table-wrap" role="region" aria-label="Agent 前缀回载配对测量" tabindex="0">'
-        f'<table><caption>各轮统计的中位数</caption><thead><tr>{headers}</tr></thead>'
-        f'<tbody>{"".join(lines)}</tbody></table></div>'
-        '<p class="sample">Direct I/O 的逐轮 P95 取该轮最大值，配对增量中位数反映典型代价。'
-        '轨迹以约 3 秒为间隔公开时间戳。物理回放对同窗样本施加相同到达时间或 '
-        '25 ms 间隔，测量单同步工作线程下的 KV 就绪时延。缓存驻留来自模拟，回载数据是确定性生成的 '
-        '4 层 KV 切片。双请求吞吐统计配对窗口的有效处理时间。'
-        f'<a href="https://github.com/KimmoZAG/SuperLoad/blob/main/docs/prefix-reload.md">方法和复现</a>{link}</p>'
-    )
+    if mobile:
+        axes[2].set_ylabel("Empirical CDF")
+    fig.legend(*axes[1].get_legend_handles_labels(), loc="lower center",
+               bbox_to_anchor=(0.55, 0.025 if mobile else 0.035),
+               frameon=False, ncol=2 if mobile else 4, fontsize=9)
+    name = "tool-agent-prefix-mobile" if mobile else "tool-agent-prefix"
+    save(fig, output, name, pdf=not mobile)

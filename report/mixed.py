@@ -19,11 +19,6 @@ SCHEMES = {
     "bidaw": "Bidaw",
     "solid": "SolidAttention",
 }
-COMPARISONS = {
-    ("buffered", "mix-balanced"): ("常规混跑 · Buffered", "每轮 24 个前缀任务和 18 个稀疏任务。"),
-    ("direct", "mix-balanced"): ("常规混跑 · Direct I/O", "每轮 24 个前缀任务和 18 个稀疏任务。"),
-    ("buffered", "mix-sparse-heavy"): ("稀疏占优 · Buffered", "每轮 12 个前缀任务和 24 个稀疏任务。"),
-}
 METRICS = ("prefix_p95_ms", "sparse_p95_ms", "logical_gib_s")
 SEEDS = (42, 43, 44)
 JOINT_SCHEMES = {**SCHEMES, "joint": "联合切分"}
@@ -33,10 +28,7 @@ JOINT_STYLE = {
     "joint": ("Joint scheduling", "#5441A4", "-"),
 }
 JOINT_RATES = {"buffered": 0.16, "direct": 0.10}
-JOINT_COMPARISONS = {
-    (mode, "mix-balanced"): (MODES[mode], f"名义输入速率 {rate:.2f} GiB/s。")
-    for mode, rate in JOINT_RATES.items()
-}
+JOINT_CONDITIONS = tuple((mode, "mix-balanced") for mode in JOINT_RATES)
 CHARTS = (
     ("prefix", "前缀回载 P95", "P95 KV-ready latency (ms, log scale)", 1),
     ("sparse", "稀疏回载 P95", "P95 KV-ready latency (ms, log scale)", 1),
@@ -44,49 +36,10 @@ CHARTS = (
 )
 
 
-def load(path):
-    expected = {
-        (*condition, scheme, seed)
-        for condition in COMPARISONS for scheme in SCHEMES for seed in SEEDS
-    }
-    runs = {}
-    with path.open(encoding="utf-8", newline="") as source:
-        for row in csv.DictReader(source):
-            key = (row["io"], row["scenario"], row["scheme"], int(row["seed"]))
-            values = tuple(float(row[field]) for field in METRICS)
-            if key not in expected or key in runs or not all(math.isfinite(v) and v > 0 for v in values):
-                raise ValueError(f"invalid mixed-workload measurement {key} in {path}")
-            runs[key] = values
-    if expected != runs.keys():
-        raise ValueError(f"missing mixed-workload measurements in {path}")
-    return runs
-
-
-def panels(runs, comparisons=COMPARISONS, schemes=SCHEMES):
-    sections = []
-    for condition, (caption, workload) in comparisons.items():
-        rows = []
-        for scheme, label in schemes.items():
-            values = [runs[(*condition, scheme, seed)] for seed in SEEDS]
-            cells = []
-            for samples, digits in zip(zip(*values), (2, 2, 3)):
-                span = f"各轮范围 {min(samples):.{digits}f}–{max(samples):.{digits}f}"
-                cells.append(f'<td><abbr title="{span}">{median(samples):.{digits}f}</abbr></td>')
-            rows.append(f'<tr><th scope="row">{label}</th>{"".join(cells)}</tr>')
-        sections.append(
-            f'<article class="profile"><div class="table-wrap mixed-table" role="region" aria-label="{caption}" tabindex="0">'
-            f'<table><caption>{caption}。{workload}</caption><thead><tr>'
-            '<th scope="col">方案</th><th scope="col">前缀 P95（ms）</th>'
-            '<th scope="col">稀疏 P95（ms）</th><th scope="col">逻辑吞吐（GiB/s）</th>'
-            f'</tr></thead><tbody>{"".join(rows)}</tbody></table></div></article>'
-        )
-    return "\n".join(sections)
-
-
 def load_joint(path):
     expected = {
         (*condition, scheme, seed)
-        for condition in JOINT_COMPARISONS for scheme in JOINT_SCHEMES for seed in SEEDS
+        for condition in JOINT_CONDITIONS for scheme in JOINT_SCHEMES for seed in SEEDS
     }
     runs = {}
     with tarfile.open(path, "r:gz") as source:
@@ -125,7 +78,7 @@ def write_joint_csv(runs, path):
 
 def render_joint(runs, output):
     matrix = {}
-    for mode, scenario in JOINT_COMPARISONS:
+    for mode, scenario in JOINT_CONDITIONS:
         for scheme in JOINT_SCHEMES:
             values = [runs[mode, scenario, scheme, seed] for seed in SEEDS]
             matrix[mode, scenario, scheme] = {
@@ -136,7 +89,7 @@ def render_joint(runs, output):
     for index, ((name, _, xlabel, digits), metric) in enumerate(zip(CHARTS, METRICS)):
         values = [row[index] for row in runs.values()]
         limits = (min(values) * 0.82, max(values) * 2.3) if index < 2 else (0, max(values) * 1.30)
-        for mode, scenario in JOINT_COMPARISONS:
+        for mode, scenario in JOINT_CONDITIONS:
             fig, ax = plt.subplots(figsize=(4.8, 2.65))
             fig.subplots_adjust(left=0.29, right=0.965, top=0.96, bottom=0.22)
             metric_panel(ax, matrix, mode, scenario, metric, limits, schemes=JOINT_STYLE, digits=digits)
@@ -155,7 +108,7 @@ def render_joint(runs, output):
             save(fig, output, f"mixed-{name}-{mode}", pdf=False)
 
 
-def joint_dashboard(runs):
+def joint_dashboard():
     sections = []
     for name, title, _, _ in CHARTS:
         panels_html = []
@@ -182,7 +135,5 @@ def joint_dashboard(runs):
         '<span><b aria-hidden="true">━</b> 延迟范围</span>'
         '<span class="mixed-joint-label">联合切分（Joint scheduling）</span></div>'
         + "".join(sections)
-        + '</div><details class="mixed-details"><summary>数值表</summary>'
-        + panels(runs, JOINT_COMPARISONS, JOINT_SCHEMES)
-        + '</details>'
+        + "</div>"
     )

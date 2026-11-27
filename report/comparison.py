@@ -132,6 +132,8 @@ def render_layout(summary, output, *, mobile):
             points = [v for mode in modes.values() for m in METHODS
                       for v in mode["gaps"][gap][m][metric]["trials"]]
             latency = metric != "gib_s"
+            axis_label = "KV-ready latency (ms, log)" if latency else "Pair throughput (GiB/s)"
+            direction = "← Lower is better" if latency else "Higher is better →"
             for i, mode in enumerate(("buffered", "direct")):
                 index = 2 * col + i if mobile else 3 * i + col
                 ax = axes.flat[index]
@@ -144,8 +146,7 @@ def render_layout(summary, output, *, mobile):
                     ax.xaxis.set_minor_formatter(NullFormatter())
                 else:
                     ax.set_xlim(0, max(points) * 1.10)
-                if i == 1 or mobile:
-                    ax.set_xlabel("KV-ready latency (ms, log)" if latency else "Pair throughput (GiB/s)")
+                ax.set_xlabel(f"{axis_label}\n{direction}" if i == 1 or mobile else direction)
                 ax.set_yticks(range(len(METHODS)), [name for name, _ in METHODS.values()])
                 ax.set_ylim(len(METHODS) - 0.5, -0.5)
                 ax.grid(axis="x")

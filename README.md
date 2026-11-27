@@ -8,7 +8,7 @@ SuperLoad 是一项面向昇腾 NPU 的 Agent 前缀 KV Cache 回载调度工作
 
 在单台昇腾 910B2 上，使用 Mooncake Tool & Agent 公开轨迹生成配对回载。回载量按单次请求实际需要从存储读取的 KV 字节数计，低回载量组为 **8–32 MiB**，高回载量组为 **≥128 MiB**。下图展示高回载量请求早到 25 ms 时，两组的 P95 与双请求吞吐。延迟从请求到达计到所需 KV 全部进入 HBM。
 
-![高回载量请求早到 25 ms 时五种方法在 Buffered 和 Direct I/O 下的 P95 与吞吐](https://kimmozag.github.io/SuperLoad/figures/method-comparison-25ms.svg)
+![高回载量请求早到 25 ms 时五种方法在 Buffered 和 Direct I/O 下的对照，P95 延迟越低越好，吞吐越高越好](https://kimmozag.github.io/SuperLoad/figures/method-comparison-25ms.svg)
 
 Direct I/O 下，相比原生 FIFO，SuperLoad 将低回载量组的 P95 从 **4,014 ms** 降到 **549 ms**。高回载量组的 P95 从 3,916 ms 升到 4,775 ms，双请求吞吐从 0.124 GiB/s 降到 0.112 GiB/s。
 

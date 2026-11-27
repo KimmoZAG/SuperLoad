@@ -93,7 +93,7 @@ def main():
     template = (STATIC / "index.html").read_text(encoding="utf-8")
     charts = "".join(
         f'<article><h3>{comparison.GAPS[gap]}</h3>'
-        + figure(f"method-comparison-{gap}ms", f"{comparison.GAPS[gap]}时五种方法的延迟与吞吐")
+        + figure(f"method-comparison-{gap}ms", f"{comparison.GAPS[gap]}时五种方法的对照，延迟越低越好，吞吐越高越好")
         + '</article>'
         for gap in (25, 0)
     )

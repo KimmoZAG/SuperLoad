@@ -61,3 +61,10 @@ sha256sum "$archive"
 [方法对照原始数据](https://github.com/KimmoZAG/SuperLoad/releases/tag/results-comparison-910b2-2026-11-27) · [问题验证原始数据](https://github.com/KimmoZAG/SuperLoad/releases/tag/results-prefix-910b2-2026-11-27)
 
 </details>
+
+## 维护者
+
+本仓库主要由以下两位共同维护。
+
+- Kimmo Zhang · [995496585@qq.com](mailto:995496585@qq.com)
+- Zhenye Huang · [2774557052@qq.com](mailto:2774557052@qq.com)

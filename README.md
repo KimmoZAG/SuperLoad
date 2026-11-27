@@ -1,12 +1,22 @@
 # SuperLoad
 
-Ascend 910B2 上的 Agent 前缀 KV Cache 回载基准。根据 Mooncake 公开请求轨迹推导存储回载块，在相同的回载请求上比较原生 FIFO、Bidaw、Strata I/O、Libra 流水和 SuperLoad。
+SuperLoad 是一项面向昇腾 NPU 的 Agent 前缀 KV Cache 回载调度工作。大小回载共用存储到 HBM 的加载通道时，大回载一旦占用通道，随后到达的小回载可能等到大回载完成。SuperLoad 将回载切成最多 16 MiB 的块，在块边界轮转请求，让小回载更早获得加载通道。
 
-[在线报告](https://kimmozag.github.io/SuperLoad/#comparison) · [研究问题](overview.md) · [方法对照](docs/comparison.md) · [问题验证](docs/prefix-reload.md)
+[研究问题](overview.md) · [实验方法](docs/comparison.md) · [仓库结构](docs/repository.md)
+
+## 实测结果
+
+在单台昇腾 910B2 上，使用 Mooncake Tool & Agent 公开轨迹生成配对回载。下图展示大回载早到 25 ms 时，五种方法的小回载 P95、大回载 P95 和双请求吞吐。P95 从请求到达计到所需 KV 全部进入 HBM。
+
+![大回载早到 25 ms 时五种方法在 Buffered 和 Direct I/O 下的 P95 与吞吐](https://kimmozag.github.io/SuperLoad/figures/method-comparison-25ms.svg)
+
+Direct I/O 下，相比原生 FIFO，SuperLoad 将小回载 P95 从 **4,014 ms** 降到 **549 ms**。大回载 P95 从 3,916 ms 升到 4,775 ms，双请求吞吐从 0.124 GiB/s 降到 0.112 GiB/s。
+
+[完整图表](https://kimmozag.github.io/SuperLoad/#comparison) · [原始测量](https://github.com/KimmoZAG/SuperLoad/releases/tag/results-comparison-910b2-2026-11-27)
 
 ## 运行方法对照
 
-在 Linux 上用 Python 3.10+。设备测量使用 Ascend 驱动和 CANN。
+运行环境为 Linux、Python 3.10+ 和昇腾 910B2，设备测量需要 Ascend 驱动与 CANN。
 
 ```bash
 mkdir -p data
@@ -20,9 +30,13 @@ python3 -m superload prefix-compare --plan runs/compare/plan.json --corpus data/
   --io direct --pair-limit 20 --storage-label longhorn-ext4 --output runs/compare/direct.json
 ```
 
-默认测量两轮，首次运行自动生成两种等价布局，合计约 15.4 GiB。Direct I/O 需要支持 `O_DIRECT` 的文件系统。问题验证使用 `prefix-plan` 和 `prefix-bench`，命令与条件见 [问题验证方法](docs/prefix-reload.md)。
+结果写入 `runs/compare/`。每种模式默认测量两轮，首次生成的两种 KV 文件布局合计约 15.4 GiB。Direct I/O 需要支持 `O_DIRECT` 的文件系统。
 
-## 构建与发布
+[问题验证的复现说明](docs/prefix-reload.md)
+
+<a name="构建与发布"></a>
+<details>
+<summary>构建与发布报告</summary>
 
 ```bash
 python3 -m unittest discover -s tests -v
@@ -30,7 +44,7 @@ python3 -m pip install -r report/requirements.txt
 python3 report/build.py --comparison-results runs/compare
 ```
 
-默认构建使用两份固定的 GitHub Release 附件，并校验 SHA-256。输出位于 `build/site/`。用 `--comparison-results` 或 `--prefix-results` 可预览本地复测，网页为该组显示汇总 JSON。反复构建同一输出目录时，构建会清理已退役的旧图和静态文件。
+默认构建使用两份固定的 GitHub Release 附件，并校验 SHA-256。输出位于 `build/site/`。用 `--comparison-results` 或 `--prefix-results` 可预览本地复测。反复构建同一输出目录时，构建会清理已退役的旧图和静态文件。
 
 发布方法对照时，将 `plan.json`、`buffered.json` 和 `direct.json` 放在 ZIP 根目录，可附环境记录。发布后更新 `report/comparison-results-release.json` 的标签、文件名和 SHA-256。重新发布问题验证时，更新 `report/prefix-results-release.json`。运行 `python3 report/build.py` 检查固定附件与网页，再推送 `main` 触发 Pages 部署。
 
@@ -46,6 +60,4 @@ sha256sum "$archive"
 
 [方法对照原始数据](https://github.com/KimmoZAG/SuperLoad/releases/tag/results-comparison-910b2-2026-11-27) · [问题验证原始数据](https://github.com/KimmoZAG/SuperLoad/releases/tag/results-prefix-910b2-2026-11-27)
 
-## 仓库文件
-
-代码、文档、报告入口及退役文件清单见 [仓库结构与清理记录](docs/repository.md)。
+</details>

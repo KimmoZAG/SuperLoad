@@ -40,28 +40,28 @@ def interleave(spec, page):
     return result
 
 
-def page_extents(layout, spec, page, target=0):
+def page_extents(layout, spec, page, target=0, page_count=PAGE_COUNT):
     plane = spec.plane_bytes
     if layout == "page-first":
         return [Extent(page * spec.page_bytes, target, spec.page_bytes)]
     if layout == "layer-major":
         return [
-            Extent((i * PAGE_COUNT + page) * plane, target + i * plane, plane)
+            Extent((i * page_count + page) * plane, target + i * plane, plane)
             for i in range(spec.layers * 2)
         ]
     if layout == "interleaved":
         span = 2 * plane
         return [
-            Extent((i * PAGE_COUNT + page) * span, target + i * span, span)
+            Extent((i * page_count + page) * span, target + i * span, span)
             for i in range(spec.layers)
         ]
     raise ValueError(f"unknown layout: {layout}")
 
 
-def make_plan(layout, spec, pages):
+def make_plan(layout, spec, pages, page_count=PAGE_COUNT):
     spans = []
     for i, page in enumerate(pages):
-        for current in page_extents(layout, spec, page, i * spec.page_bytes):
+        for current in page_extents(layout, spec, page, i * spec.page_bytes, page_count):
             if spans:
                 prev = spans[-1]
                 if prev.offset + prev.size == current.offset and prev.target + prev.size == current.target:
@@ -81,21 +81,21 @@ def write_at(fd, data, offset):
         view = view[count:]
 
 
-def generate(directory, spec, seed):
+def generate(directory, spec, seed, *, page_count=PAGE_COUNT, layouts=LAYOUTS):
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
     manifest = directory / "manifest.json"
-    if manifest.exists() or any((directory / f"{name}.bin").exists() for name in LAYOUTS):
+    if manifest.exists() or any((directory / f"{name}.bin").exists() for name in layouts):
         raise FileExistsError(f"choose an empty corpus directory: {directory}")
     files = {}
     try:
-        for name in LAYOUTS:
+        for name in layouts:
             files[name] = (directory / f"{name}.bin").open("xb")
-        for page in range(PAGE_COUNT):
+        for page in range(page_count):
             canonical = page_bytes(seed, page, spec.page_bytes)
             for name, handle in files.items():
                 payload = interleave(spec, canonical) if name == "interleaved" else canonical
-                for extent in page_extents(name, spec, page):
+                for extent in page_extents(name, spec, page, page_count=page_count):
                     write_at(handle.fileno(), payload[extent.target:extent.target + extent.size], extent.offset)
         for handle in files.values():
             os.fsync(handle.fileno())
@@ -117,7 +117,7 @@ def read_manifest(directory):
     return Geometry(**manifest["geometry"]), int(manifest["seed"])
 
 
-def open_corpus(directory, layout, spec, mode):
+def open_corpus(directory, layout, spec, mode, *, page_count=PAGE_COUNT):
     path = Path(directory) / f"{layout}.bin"
     flags = os.O_RDONLY
     if mode == "direct":
@@ -125,7 +125,7 @@ def open_corpus(directory, layout, spec, mode):
             raise ValueError("direct I/O requires Linux and page-aligned KV planes")
         flags |= os.O_DIRECT
     fd = os.open(path, flags)
-    if os.fstat(fd).st_size != PAGE_COUNT * spec.page_bytes:
+    if os.fstat(fd).st_size != page_count * spec.page_bytes:
         os.close(fd)
         raise ValueError(f"invalid corpus size: {path.name}")
     return fd

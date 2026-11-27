@@ -4,23 +4,25 @@ import time
 from collections import Counter
 
 from ..dataset.corpus import make_plan, page_extents, read_spans
+from ..dataset.workloads import PAGE_COUNT
 from ..hardware.device import HostBuffer
 
 
 class LocalSource:
-    def __init__(self, fd, stager, device, spec, layout):
+    def __init__(self, fd, stager, device, spec, layout, page_count=PAGE_COUNT):
         self.fd = fd
         self.stager = stager
         self.device = device
         self.spec = spec
         self.layout = layout
+        self.page_count = page_count
 
     def load(self, pages, dest, cache=None, request=None, prefetched=None):
         length = len(pages) * self.spec.page_bytes
         metrics = Counter()
         start = time.perf_counter_ns()
         if cache is None and prefetched is None:
-            spans = make_plan(self.layout, self.spec, pages)
+            spans = make_plan(self.layout, self.spec, pages, self.page_count)
         else:
             spans = []
             misses = []
@@ -28,7 +30,7 @@ class LocalSource:
                 target = i * self.spec.page_bytes
                 cached = cache.get(page) if cache else prefetched.get(page)
                 if cached is None:
-                    spans.extend(page_extents(self.layout, self.spec, page, target))
+                    spans.extend(page_extents(self.layout, self.spec, page, target, self.page_count))
                     misses.append((page, target))
                 else:
                     self.stager.view[target:target + self.spec.page_bytes] = cached
@@ -57,7 +59,8 @@ class LocalSource:
         step = self.spec.page_bytes
         buffer = HostBuffer(len(pages) * step)
         try:
-            calls, amount = read_spans(self.fd, buffer.view, make_plan(self.layout, self.spec, pages))
+            spans = make_plan(self.layout, self.spec, pages, self.page_count)
+            calls, amount = read_spans(self.fd, buffer.view, spans)
             values = {page: bytes(buffer.view[i * step:(i + 1) * step]) for i, page in enumerate(pages)}
         finally:
             buffer.close()

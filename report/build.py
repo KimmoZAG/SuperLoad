@@ -1,4 +1,4 @@
-"""Build the report and vector figures from checked-in hardware results."""
+"""Build the report and vector figures from released hardware results."""
 
 import argparse
 import html
@@ -9,6 +9,7 @@ from pathlib import Path
 from statistics import median
 
 import mixed
+import prefix
 from figures import render, stage_values
 from release_data import ResultsRelease
 
@@ -214,7 +215,8 @@ def insights(matrix):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--results", type=Path, help="Use a local results directory instead of the pinned release")
+    ap.add_argument("--results", type=Path, help="Use a local mechanism results directory")
+    ap.add_argument("--prefix-results", type=Path, help="Use a local Agent prefix results directory")
     ap.add_argument("--output", type=Path, default=ROOT / "build/site")
     args = ap.parse_args()
     release = None
@@ -224,6 +226,15 @@ def main():
             matrix = load(directory)
     else:
         matrix = load(args.results)
+    prefix_release = None
+    if args.prefix_results is None:
+        prefix_release = ResultsRelease.read(HERE / "prefix-results-release.json")
+        with prefix_release.unpack(ROOT / "build" / "results") as directory:
+            prefix_plan, prefix_runs = prefix.read(directory)
+    else:
+        prefix_plan, prefix_runs = prefix.read(args.prefix_results)
+    prefix_summary = prefix.summarize(prefix_plan, prefix_runs)
+    prefix.render(prefix_summary, prefix_runs, args.output / "figures")
     mixed_runs = mixed.load(MIXED_RESULTS)
     render(matrix, args.output / "figures")
     static = args.output / "assets"
@@ -241,6 +252,9 @@ def main():
             row["stage_mean_ms_per_request"] = dict(zip(keys, stage_values(cell)))
         output["runs"].append(row)
     (static / "summary.json").write_text(json.dumps(output, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    (static / "prefix-summary.json").write_text(
+        json.dumps(prefix_summary, indent=2, ensure_ascii=False) + "\n", encoding="utf-8",
+    )
     template = (STATIC / "index.html").read_text(encoding="utf-8")
     detail = "\n".join((
         figure("latency-ecdf", "两种负载的请求级延迟分布",
@@ -254,7 +268,9 @@ def main():
                "RC 段含注册窗口整理，堆叠值只覆盖加载阶段。"),
     ))
     raw_link = f' · <a href="{html.escape(release.page_url)}">原始样本（Release）</a>' if release else ""
+    prefix_panel = prefix.panel(prefix_summary, prefix_release.page_url if prefix_release else "", figure)
     report = (template.replace("@@RESULTS@@", panels(matrix)).replace("@@INSIGHTS@@", insights(matrix))
+              .replace("@@PREFIX_RESULTS@@", prefix_panel)
               .replace("@@MIXED_RESULTS@@", mixed.panels(mixed_runs))
               .replace("@@FIGURES@@", detail).replace("@@RESULTS_RELEASE@@", raw_link))
     (args.output / "index.html").write_text(report, encoding="utf-8")

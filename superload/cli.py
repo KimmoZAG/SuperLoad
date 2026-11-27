@@ -7,7 +7,9 @@ from dataclasses import asdict
 from pathlib import Path
 
 from .benchmark import CONTROLS, SCHEMES, run
+from .benchmark.prefix import measure as measure_prefix
 from .dataset.corpus import generate, read_manifest
+from .dataset.prefix import build_plan
 from .dataset.workloads import Geometry, PAGE_COUNT, PROFILES, make_trace
 from .schemes.roce import serve
 
@@ -66,6 +68,23 @@ def parser():
     trace.add_argument("--waves", type=positive, default=64)
     trace.add_argument("--output")
 
+    prefix = commands.add_parser("prefix-plan", help="derive reload cohorts from the Mooncake Tool & Agent trace")
+    prefix.add_argument("--trace", required=True)
+    prefix.add_argument("--sample", type=positive, default=64)
+    prefix.add_argument("--warmup", type=int, default=100)
+    prefix.add_argument("--seed", type=int, default=42)
+    prefix.add_argument("--output", required=True)
+
+    pairs = commands.add_parser("prefix-bench", help="measure matched storage-to-HBM prefix reloads")
+    corpus_args(pairs)
+    pairs.add_argument("--plan", required=True)
+    pairs.add_argument("--device", default="0")
+    pairs.add_argument("--repeat", type=positive, default=3)
+    pairs.add_argument("--pair-limit", type=positive, help="measure a deterministic subset of the planned pairs")
+    pairs.add_argument("--seed", type=int, default=42)
+    pairs.add_argument("--storage-label", default="unspecified")
+    pairs.add_argument("--output", required=True)
+
     bench = commands.add_parser("bench", help="measure a scheme or an ablation against the same trace")
     corpus_args(bench)
     roce_args(bench)
@@ -104,6 +123,13 @@ def main():
     if args.command == "trace":
         waves = make_trace(args.profile, args.seed, args.waves)
         write_json({"profile": args.profile, "seed": args.seed, "waves": [asdict(w) for w in waves]}, args.output)
+        return 0
+    if args.command == "prefix-plan":
+        write_json(build_plan(args.trace, args.sample, args.warmup, args.seed), args.output)
+        return 0
+    if args.command == "prefix-bench":
+        payload = Path(args.plan).read_bytes()
+        write_json(measure_prefix(args, json.loads(payload), payload), args.output)
         return 0
     if args.command == "serve-roce":
         if args.max_pages > PAGE_COUNT:

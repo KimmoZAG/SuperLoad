@@ -50,6 +50,8 @@ h3 { line-height: 1.35; font-size: 1.16rem; margin-bottom: .55rem; }
 .schematic p { color: #b1cfc4; font-size: .86rem; margin: 1rem 0 0; }
 .body { padding-bottom: 3.5rem; }
 .body > section { padding-top: 3.55rem; scroll-margin-top: .75rem; }
+#mechanism-archive details[data-archive] > section { margin-top: 2.6rem; scroll-margin-top: .75rem; }
+#prefix-contention .paper-figure { margin-block: 1.25rem; }
 .section-top { display: flex; gap: 1.25rem; align-items: end; justify-content: space-between; margin-bottom: 1.35rem; }
 .section-top p, .sample { color: var(--muted); margin: 0; }
 .text-link { white-space: nowrap; font-weight: 650; }

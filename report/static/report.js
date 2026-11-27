@@ -16,3 +16,15 @@ profileSwitch.addEventListener("click", (event) => {
   if (button) selectProfile(button.dataset.target);
 });
 selectProfile("interactive-prefix");
+
+function showArchivedSection() {
+  const archive = document.querySelector("[data-archive]");
+  const target = document.getElementById(window.location.hash.slice(1));
+  if (target && archive.contains(target)) {
+    archive.open = true;
+    target.scrollIntoView();
+  }
+}
+
+showArchivedSection();
+window.addEventListener("hashchange", showArchivedSection);

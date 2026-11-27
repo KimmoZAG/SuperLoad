@@ -1,16 +1,16 @@
 # SuperLoad
 
-SuperLoad 是一项面向昇腾 NPU 的 Agent 前缀 KV Cache 回载调度工作。大小回载共用存储到 HBM 的加载通道时，大回载一旦占用通道，随后到达的小回载可能等到大回载完成。SuperLoad 将回载切成最多 16 MiB 的块，在块边界轮转请求，让小回载更早获得加载通道。
+SuperLoad 是一项面向昇腾 NPU 的 Agent 前缀 KV Cache 回载调度工作。高回载量请求占用存储到 HBM 的通道时，随后到达的低回载量请求可能等到通道释放。SuperLoad 将回载切成最多 16 MiB 的块，在块边界轮转请求，让后到的低回载量请求更早获得通道。
 
 [研究问题](overview.md) · [实验方法](docs/comparison.md) · [仓库结构](docs/repository.md)
 
 ## 实测结果
 
-在单台昇腾 910B2 上，使用 Mooncake Tool & Agent 公开轨迹生成配对回载。下图展示大回载早到 25 ms 时，五种方法的小回载 P95、大回载 P95 和双请求吞吐。P95 从请求到达计到所需 KV 全部进入 HBM。
+在单台昇腾 910B2 上，使用 Mooncake Tool & Agent 公开轨迹生成配对回载。回载量按单次请求实际需要从存储读取的 KV 字节数计，低回载量组为 **8–32 MiB**，高回载量组为 **≥128 MiB**。下图展示高回载量请求早到 25 ms 时，两组的 P95 与双请求吞吐。延迟从请求到达计到所需 KV 全部进入 HBM。
 
-![大回载早到 25 ms 时五种方法在 Buffered 和 Direct I/O 下的 P95 与吞吐](https://kimmozag.github.io/SuperLoad/figures/method-comparison-25ms.svg)
+![高回载量请求早到 25 ms 时五种方法在 Buffered 和 Direct I/O 下的 P95 与吞吐](https://kimmozag.github.io/SuperLoad/figures/method-comparison-25ms.svg)
 
-Direct I/O 下，相比原生 FIFO，SuperLoad 将小回载 P95 从 **4,014 ms** 降到 **549 ms**。大回载 P95 从 3,916 ms 升到 4,775 ms，双请求吞吐从 0.124 GiB/s 降到 0.112 GiB/s。
+Direct I/O 下，相比原生 FIFO，SuperLoad 将低回载量组的 P95 从 **4,014 ms** 降到 **549 ms**。高回载量组的 P95 从 3,916 ms 升到 4,775 ms，双请求吞吐从 0.124 GiB/s 降到 0.112 GiB/s。
 
 [完整图表](https://kimmozag.github.io/SuperLoad/#comparison) · [原始测量](https://github.com/KimmoZAG/SuperLoad/releases/tag/results-comparison-910b2-2026-11-27)
 

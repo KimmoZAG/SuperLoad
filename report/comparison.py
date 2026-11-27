@@ -7,7 +7,7 @@ from collections import defaultdict
 from itertools import product
 from statistics import median
 
-from figures import MODES, panel_title, save
+from figures import HIGH_RELOAD_RANGE, LOW_RELOAD_RANGE, MODES, panel_title, save
 from matplotlib import pyplot as plt
 from matplotlib.lines import Line2D
 from matplotlib.ticker import LogLocator, NullFormatter, ScalarFormatter
@@ -21,7 +21,7 @@ METHODS = {
     "libra": ("Libra pipeline", "#C34E00"),
     "chunk-rr": ("SuperLoad", "#A44783"),
 }
-GAPS = {0: "同时到达", 25: "大回载早到 25 ms"}
+GAPS = {0: "同时到达", 25: "高回载量请求早到 25 ms"}
 
 
 def read(directory):
@@ -116,7 +116,11 @@ def render(summary, output):
 
 def render_layout(summary, output, *, mobile):
     modes = summary["measurements"]
-    columns = (("small_p95", "Small P95"), ("large_p95", "Large P95"), ("gib_s", "Throughput"))
+    columns = (
+        ("small_p95", f"{LOW_RELOAD_RANGE} P95"),
+        ("large_p95", f"{HIGH_RELOAD_RANGE} P95"),
+        ("gib_s", "Throughput"),
+    )
     for gap in GAPS:
         if mobile:
             fig, axes = plt.subplots(6, 1, figsize=(5.2, 15.5))

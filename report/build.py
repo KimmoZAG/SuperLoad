@@ -7,6 +7,7 @@ import shutil
 from pathlib import Path
 
 import comparison
+from figures import HIGH_RELOAD_RANGE, LOW_RELOAD_RANGE
 from overview import render_overview, render_poster_results
 import prefix
 from release_data import ResultsRelease
@@ -99,7 +100,9 @@ def main():
     overview = render_overview((ROOT / "overview.md").read_text(encoding="utf-8"))
     report = (template.replace("@@POSTER_RESULTS@@", render_poster_results(compare_summary))
               .replace("@@OVERVIEW@@", overview)
-              .replace("@@PREFIX_RESULTS@@", figure("tool-agent-prefix", "共现率与小回载就绪时延"))
+              .replace("@@PREFIX_RESULTS@@", figure("tool-agent-prefix", "两组请求的共现率与低回载量组就绪延迟"))
+              .replace("@@LOW_RELOAD_RANGE@@", LOW_RELOAD_RANGE)
+              .replace("@@HIGH_RELOAD_RANGE@@", HIGH_RELOAD_RANGE)
               .replace("@@COMPARISON@@", charts)
               .replace("@@PREFIX_DOWNLOAD@@", download_link(release, "问题验证原始 ZIP"))
               .replace("@@COMPARISON_DOWNLOAD@@", download_link(compare_release, "对照原始 ZIP")))

@@ -58,12 +58,12 @@ def render_poster_results(summary):
     throughput_after = superload["gib_s"]["median"]
     return (
         '<section class="poster-results" aria-labelledby="poster-results-title">'
-        '<h2 id="poster-results-title">小回载 P95</h2>'
+        '<h2 id="poster-results-title">低回载量请求 P95</h2>'
         f'<ul class="result-bars">{"".join(small_rows)}</ul>'
         '<dl class="poster-tradeoffs">'
-        f'<div><dt>大回载 P95</dt><dd>{large_before:.2f} → {large_after:.2f} <small>s</small></dd></div>'
+        f'<div><dt>高回载量请求 P95</dt><dd>{large_before:.2f} → {large_after:.2f} <small>s</small></dd></div>'
         f'<div><dt>双请求吞吐</dt><dd>{throughput_before:.3f} → {throughput_after:.3f} '
         '<small>GiB/s</small></dd></div></dl>'
-        '<a class="result-context" href="#comparison">Direct I/O · 大回载早到 25 ms · '
+        '<a class="result-context" href="#comparison">Direct I/O · 高回载量请求早到 25 ms · '
         f'{direct["pairs"]} 对 × {direct["repeat"]} 轮</a></section>'
     )

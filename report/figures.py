@@ -7,6 +7,8 @@ from matplotlib import pyplot as plt
 
 
 MODES = {"buffered": "Buffered", "direct": "Direct I/O"}
+LOW_RELOAD_RANGE = "8–32 MiB"
+HIGH_RELOAD_RANGE = "≥128 MiB"
 INK = "#17242B"
 MUTED = "#627078"
 

@@ -9,14 +9,14 @@ from statistics import median
 from matplotlib import pyplot as plt
 from matplotlib.ticker import LogLocator, NullFormatter, PercentFormatter, ScalarFormatter
 
-from figures import MODES, panel_title, save
+from figures import HIGH_RELOAD_RANGE, LOW_RELOAD_RANGE, MODES, panel_title, save
 
 
 CASES = {
-    "small-only": ("Small alone", "#505963", "-"),
-    "small-first": ("Small first", "#0072B2", "--"),
-    "large-first": ("Large first", "#C34E00", "-"),
-    "large-first-25ms": ("Large arrives 25 ms earlier", "#008463", "-."),
+    "small-only": (f"{LOW_RELOAD_RANGE} alone", "#505963", "-"),
+    "small-first": (f"{LOW_RELOAD_RANGE} first", "#0072B2", "--"),
+    "large-first": (f"{HIGH_RELOAD_RANGE} first", "#C34E00", "-"),
+    "large-first-25ms": (f"{HIGH_RELOAD_RANGE} 25 ms earlier", "#008463", "-."),
 }
 
 
@@ -131,7 +131,7 @@ def render_layout(summary, measurements, output, *, mobile):
     for row in summary["sweep"]:
         sweep[tuple(row["capacity_gib"])].append(row["mixed_windows"] / row["windows"])
     ax = axes[0]
-    panel_title(ax, "A", "Small and large in one window")
+    panel_title(ax, "A", "Both reload groups in one window")
     for index, (capacity, fractions) in enumerate(sweep.items()):
         color = "#0072B2" if list(capacity) == summary["primary_gib"] else "#505963"
         ax.hlines(index, min(fractions), max(fractions), color=color, linewidth=3)
@@ -167,7 +167,7 @@ def render_layout(summary, measurements, output, *, mobile):
         axis.set_ylim(0, 1.03)
         axis.set_yticks([0, 0.25, 0.5, 0.75, 0.95])
         axis.yaxis.set_major_formatter(PercentFormatter(1))
-        axis.set_xlabel("Small reload ready (ms, log)")
+        axis.set_xlabel(f"{LOW_RELOAD_RANGE} KV-ready latency (ms, log)")
         axis.grid(axis="y")
     axes[1].set_ylabel("Empirical CDF")
     if mobile:

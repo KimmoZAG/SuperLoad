@@ -25,8 +25,8 @@
       <div class="poster-opening">
         <div class="poster-intro">
           <p class="poster-context">Agent 前缀 KV Cache · 昇腾 910B2</p>
-          <h1 id="overview-title">大回载在前，<br>小回载要等多久？</h1>
-          <p class="poster-question">让后到的小回载更早进入 HBM，同时衡量大回载的完成时间和共享通道吞吐。</p>
+          <h1 id="overview-title">KV 前缀回载中的<br>队首阻塞</h1>
+          <p class="poster-question">高回载量请求先占用通道时，如何缩短低回载量请求的尾延迟？</p>
           <ol class="reload-path" aria-label="KV 回载路径">
             <li>存储</li>
             <li>主机 DRAM</li>
@@ -39,23 +39,28 @@
       <div class="poster-evidence">
         <section class="poster-flow" aria-labelledby="poster-flow-title">
           <h2 id="poster-flow-title">在块边界让出通道</h2>
-          <div class="timeline" role="img" aria-label="小回载在大回载开始后到达。原生 FIFO 处理完整的大回载后才处理小回载。SuperLoad 按块轮转，小回载可在大回载的块之间执行。">
-            <div class="timeline-arrival" aria-hidden="true"><span>小回载到达</span></div>
+          <div class="timeline" role="img" aria-label="原生 FIFO 按请求调度，后到的低回载量请求需等待高回载量请求完成。SuperLoad 按块轮转，低回载量请求可在块边界获得通道。">
+            <div class="timeline-arrival" aria-hidden="true"><span>低回载量请求到达</span></div>
             <div class="timeline-row" aria-hidden="true">
               <span>原生 FIFO</span>
               <div class="timeline-lane timeline-fifo">
-                <b class="large-slot">大回载</b><b class="small-slot">小</b>
+                <span class="high-volume-slot"></span><span class="low-volume-slot"></span>
               </div>
             </div>
             <div class="timeline-row" aria-hidden="true">
               <span>SuperLoad</span>
               <div class="timeline-lane timeline-chunks">
-                <b class="large-slot">大</b><b class="large-slot">大</b><b class="small-slot">小</b>
-                <b class="large-slot">大</b><b class="large-slot">大</b>
+                <span class="high-volume-slot"></span><span class="high-volume-slot"></span>
+                <span class="low-volume-slot"></span>
+                <span class="high-volume-slot"></span><span class="high-volume-slot"></span>
               </div>
             </div>
           </div>
-          <p class="timeline-caption">加载顺序示意 · 从左到右</p>
+          <div class="timeline-key" aria-label="回载量分组">
+            <span class="low-volume-key">低回载量组 @@LOW_RELOAD_RANGE@@</span>
+            <span class="high-volume-key">高回载量组 @@HIGH_RELOAD_RANGE@@</span>
+          </div>
+          <p class="timeline-caption">回载量按单次从存储读取的 KV 字节数计。示意图从左到右表示执行顺序。</p>
         </section>
         <section class="poster-motivation" aria-labelledby="poster-motivation-title">
           <h2 id="poster-motivation-title">排队影响首 token</h2>
@@ -78,7 +83,7 @@
           </article>
           <article>
             <h3>块边界 · 调度让行</h3>
-            <p><strong>SuperLoad</strong> 在块边界轮转请求，小回载可以在大回载完成之前推进。</p>
+            <p><strong>SuperLoad</strong> 在块边界轮转请求，让低回载量请求在高回载量请求完成之前推进。</p>
           </article>
         </div>
       </section>

@@ -19,7 +19,7 @@ METHODS = {
     "bidaw": ("Bidaw", "#0072B2"),
     "strata-io": ("Strata I/O", "#008463"),
     "libra": ("Libra pipeline", "#C34E00"),
-    "chunk-rr": ("Chunk RR", "#A44783"),
+    "chunk-rr": ("SuperLoad", "#A44783"),
 }
 GAPS = {0: "同时到达", 25: "大回载早到 25 ms"}
 

@@ -16,7 +16,7 @@
 | Bidaw | 已知存储缺页量，用等待时间除以回载块数决定待服务请求的 Disk-HRRN 优先级。缓存模型固定，测量范围为论文的存储队列排序。 [论文 §3.2](https://www.usenix.org/system/files/fast26-hu-shipeng.pdf) |
 | Strata I/O | 使用 page-first 布局，按文件页位置排序并合并相邻读，按 FIFO 处理。共享页和模型批调度需要相应的工作负载。 [论文](https://www.usenix.org/conference/osdi26/presentation/xie-zhiqiang) |
 | Libra 流水 | 保留 FIFO，在请求内切成 16 MiB 块，两个 DRAM 缓冲交替工作。将论文的计算与跨实例 KV 传输流水移植到本机读文件和 H2D 两阶段。主线程拷入当前块，读线程并行读下一块。 [论文 §4.3](https://www.usenix.org/system/files/nsdi26-ruan-libra.pdf) |
-| 固定分块轮转 | 使用与 Libra 相同的 16 MiB 块。每一块同步读入 DRAM 并拷入 HBM，然后在排队请求间轮转。在块结束时接纳本块执行期间到达的请求。 |
+| SuperLoad | 使用固定分块轮转，采用与 Libra 相同的 16 MiB 块。每一块同步读入 DRAM 并拷入 HBM，然后在排队请求间轮转。在块结束时接纳本块执行期间到达的请求。 |
 
 ## 指标和解释范围
 
@@ -36,7 +36,7 @@
 | Bidaw | 1,191 | 0.552 | 3,956 | 3,887 | 0.124 |
 | Strata I/O | 1,242 | 0.567 | 1,529 | 1,489 | 0.303 |
 | Libra 流水 | 1,229 | 0.840 | 3,490 | 3,383 | 0.155 |
-| 固定分块轮转 | 116 | 0.602 | 549 | 4,775 | 0.112 |
+| SuperLoad | 116 | 0.602 | 549 | 4,775 | 0.112 |
 
 - **待发请求排序**。同时到达时，Bidaw 将 Direct 小回载 P95 从 3,914 ms 降到 264 ms。大回载先占用加载器时，Bidaw 只能排序尚未开始的请求。
 - **读合并**。Strata I/O 在 Direct 下将每对请求的平均读调用从 332.8 次降到 3.7 次，并同时降低大小回载的 P95。Buffered 下的 P95 变化有限。

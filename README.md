@@ -1,6 +1,6 @@
 # SuperLoad
 
-Ascend 910B2 上的 Agent 前缀 KV Cache 回载基准。根据 Mooncake 公开请求轨迹推导存储回载块，在相同的回载请求上比较原生 FIFO、Bidaw、Strata I/O、Libra 流水和固定分块轮转。
+Ascend 910B2 上的 Agent 前缀 KV Cache 回载基准。根据 Mooncake 公开请求轨迹推导存储回载块，在相同的回载请求上比较原生 FIFO、Bidaw、Strata I/O、Libra 流水和 SuperLoad。
 
 [在线报告](https://kimmozag.github.io/SuperLoad/#comparison) · [研究问题](overview.md) · [方法对照](docs/comparison.md) · [问题验证](docs/prefix-reload.md)
 

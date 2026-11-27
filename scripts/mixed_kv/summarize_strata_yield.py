@@ -8,10 +8,13 @@ from collections import defaultdict
 from pathlib import Path
 from statistics import mean, median
 
+from .joint_schedule import JOINT_POLICIES
+
 
 PREFIX = "interactive-prefix"
 SPARSE = "sparse-decode"
 BLOCKING = ("prefix_read_ns", "prefix_h2d_ns", "sparse_read_ns", "sparse_h2d_ns")
+PARALLEL_POLICIES = ("h2d-pipeline", *JOINT_POLICIES)
 
 
 def quantile(xs, fraction):
@@ -44,7 +47,7 @@ def validate(row, full):
         == stats["storage_bytes"]
         == logical - stats.get("shared_pages_saved", 0) * row["page_bytes"]
     )
-    if row["policy"] != "h2d-pipeline":
+    if row["policy"] not in PARALLEL_POLICIES:
         assert all(a[3] <= b[2] for a, b in zip(intervals, intervals[1:]))
     for phase in ("read", "h2d"):
         ordered = [i for i in intervals if i[1] == phase]
@@ -61,7 +64,7 @@ def validate(row, full):
             quantile([(r["ready_ns"] - r["arrival_ns"]) / 1e6 for r in records], 0.95),
             measured["p95_ms"],
         )
-        if kind == SPARSE and row["policy"] != "h2d-pipeline":
+        if kind == SPARSE:
             for r in records:
                 blocking = defaultdict(int)
                 for owner, phase, start, stop in intervals:
@@ -70,7 +73,8 @@ def validate(row, full):
                         label = "prefix" if owner == PREFIX else "sparse"
                         blocking[f"{label}_{phase}_ns"] += overlap
                 assert dict(blocking) == r["blocking"]
-                assert sum(blocking.values()) <= r["start_ns"] - r["arrival_ns"]
+                if row["policy"] not in PARALLEL_POLICIES:
+                    assert sum(blocking.values()) <= r["start_ns"] - r["arrival_ns"]
 
 
 def tail_breakdown(trial):
@@ -84,7 +88,7 @@ def tail_breakdown(trial):
         "other_wait_ns": mean(
             r["start_ns"] - r["arrival_ns"] - sum(r["blocking"].values()) for r in tail
         )
-        if trial["policy"] != "h2d-pipeline"
+        if trial["policy"] not in PARALLEL_POLICIES
         else 0,
     }
     for field in BLOCKING:
@@ -120,6 +124,12 @@ def metrics(trials, key):
         "copies",
     ):
         row[field] = median(r["counts"].get(field, 0) for r in trials)
+    if "costs_ns" in trials[0]:
+        row["fixed_chunk_pages"] = (
+            int(policy.split("-")[1]) if policy.startswith("fixed-") else None
+        )
+        for field in ("decisions", "scheduler_ns", "prefix_read_splits", "prefix_h2d_splits"):
+            row[field] = median(r["counts"].get(field, 0) for r in trials)
     tail = [tail_breakdown(r) for r in trials]
     for field in tail[0]:
         row["tail_" + field.replace("_ns", "_ms")] = mean(t[field] for t in tail) / 1e6
@@ -170,7 +180,7 @@ def comparisons(grouped):
 
 def output_file(path, rows):
     with path.open("w", encoding="utf-8", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=rows[0].keys())
+        writer = csv.DictWriter(f, fieldnames=dict.fromkeys(k for row in rows for k in row))
         writer.writeheader()
         writer.writerows(rows)
 

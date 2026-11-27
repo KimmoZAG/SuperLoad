@@ -6,6 +6,7 @@ import time
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import ExitStack
+from dataclasses import asdict
 from pathlib import Path
 
 from superload.benchmark.metrics import percentile
@@ -15,15 +16,19 @@ from superload.hardware.device import Ascend, CPU, HostBuffer
 from superload.schemes.bidaw import HostCache
 from superload.schemes.local import LocalSource
 
+from .joint_schedule import JointSchedule, calibrate
+from .strata_yield import SPARSE_SLOT_PAGES, Trial as StageTrial
 from .trace import DEADLINE_MS, GIB, MIB, PREFIX, SPARSE, arrival_trace
 
 
 SCHEMES = ("native", "edf", "strata", "strata-io", "bidaw", "native-lru", "solid", "solid-io")
+JOINT_COMPARISON = ("native-lru", "strata", "bidaw", "solid", "joint")
 LAYOUT = {
     "strata": "page-first",
     "strata-io": "page-first",
     "solid": "interleaved",
     "solid-io": "interleaved",
+    "joint": "page-first",
 }
 ARENA_BYTES = 4096 * MIB
 STAGING_PAGES = 64
@@ -31,8 +36,8 @@ CACHE_PAGES = 24
 PREFETCH_PAGES = 6
 
 
-def prepare_trace(scenario, seed, spec, rate):
-    trace = arrival_trace(scenario, seed, spec.page_bytes, rate, 1)
+def prepare_trace(scenario, seed, spec, rate, scale=1):
+    trace = arrival_trace(scenario, seed, spec.page_bytes, rate, scale)
     for req in trace:
         if req.profile == SPARSE:
             req.session += 1000
@@ -40,6 +45,8 @@ def prepare_trace(scenario, seed, spec, rate):
 
 
 def campaign(suite):
+    if suite == "joint":
+        return [("mix-balanced", scheme) for scheme in JOINT_COMPARISON]
     if suite == "smoke":
         return [("mix-balanced", s) for s in ("strata", "bidaw", "solid")]
     if suite == "direct":
@@ -253,16 +260,40 @@ class Trial:
         }
 
 
+def run_joint(trial, fd, costs):
+    stages = StageTrial(
+        trial.trace,
+        fd,
+        trial.spec,
+        trial.device,
+        trial.arena,
+        trial.staging,
+        "joint",
+        None,
+        trial.pool,
+    )
+    trial.wall = JointSchedule(
+        stages, costs, STAGING_PAGES - SPARSE_SLOT_PAGES, SPARSE_SLOT_PAGES
+    ).run()
+    trial.counts.update(stages.counters)
+    trial.counts["disk_ns"] = stages.counters["read_ns"]
+    trial.counts["shared_transfers_saved"] = stages.counters["shared_pages_saved"]
+    return stages.events
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--corpus", required=True)
     ap.add_argument("--output", type=Path, required=True)
-    ap.add_argument("--suite", choices=("smoke", "buffered", "direct"), default="buffered")
+    ap.add_argument("--suite", choices=("smoke", "buffered", "direct", "joint"), default="buffered")
     ap.add_argument("--io", choices=("buffered", "direct"), default="buffered")
     ap.add_argument("--device", default="0")
     ap.add_argument("--seeds", type=int, nargs="+", default=(42, 43, 44))
     ap.add_argument("--offered-gib-s", type=float, default=0.28)
+    ap.add_argument("--scale", type=int, default=1)
     args = ap.parse_args()
+    if args.scale < 1:
+        ap.error("scale must be positive")
     args.output.mkdir(parents=True)
     spec, corpus_seed = read_manifest(args.corpus)
     with ExitStack() as stack:
@@ -271,17 +302,28 @@ def main():
         staging = HostBuffer(STAGING_PAGES * spec.page_bytes)
         stack.callback(staging.close)
         pool = stack.enter_context(ThreadPoolExecutor(max_workers=1))
+        if args.suite == "joint":
+            joint_fd = open_corpus(args.corpus, "page-first", spec, args.io)
+            stack.callback(os.close, joint_fd)
+            setup = StageTrial((), joint_fd, spec, device, base, staging, "joint", None, pool)
+            costs = calibrate(setup)
+            print("calibrated costs (ns)", asdict(costs), flush=True)
         for seed in args.seeds:
             cells = campaign(args.suite)
             random.Random(seed).shuffle(cells)
             for scenario, scheme in cells:
                 print(f"{args.io} {seed} {scenario} {scheme}", flush=True)
-                trace = prepare_trace(scenario, seed, spec, args.offered_gib_s)
+                trace = prepare_trace(scenario, seed, spec, args.offered_gib_s, args.scale)
                 trial = Trial(
                     args, spec, corpus_seed, scheme, scenario, device, base, staging, pool, trace
                 )
-                trial.run()
+                if scheme == "joint":
+                    intervals = run_joint(trial, joint_fd, costs)
+                else:
+                    trial.run()
                 result = trial.collect(args.suite == "smoke")
+                if scheme == "joint":
+                    result.update(stage_intervals=intervals, costs_ns=asdict(costs))
                 result.update(
                     seed=seed,
                     backend="cpu" if args.device == "cpu" else "ascend",

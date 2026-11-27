@@ -93,3 +93,22 @@ tar -czf "$out/strata-diagnosis-results.tar.gz" -C "$out" \
 python3 -m scripts.mixed_kv.summarize_strata_yield "$out/strata-diagnosis-results.tar.gz" \
   --output "$out/strata-diagnosis-summary"
 ~~~
+
+## 联合切分与四种方案的混跑对照
+
+`joint` 在同一个去重后的前缀批和一个已到达的稀疏请求之间选择文件读区间和 H2D 切点。调度器根据分段耗时和各请求的最后一页预测就绪时间，比较相对独跑耗时的最大放大倍数。读线程和同步 H2D 可以并行，双方使用同一个 128 MiB 中转窗口中互不重叠的范围。
+
+同一批次包含 LRU、Strata、Bidaw、SolidAttention 和联合切分。每轮回放 12 批前缀请求与 36 个稀疏请求，沿用排队诊断的名义速率。五个方案在同一 I/O 模式和种子下使用相同的到达时刻及页 ID。联合切分的读取和 H2D 耗时按 I/O 模式单独校准，校准在计时之外。
+
+[联合切分的五方案测量记录](../report/results/joint-four-baselines/README.md) 包含汇总数据和可重算的原始归档。
+
+~~~bash
+for file in "$out/corpus/"*.bin; do cat "$file" >/dev/null; done
+python3 -m scripts.mixed_kv.paper_comparison --suite joint --scale 2 --io buffered \
+  --offered-gib-s 0.16 --corpus "$out/corpus" --output "$out/joint/buffered"
+python3 -m scripts.mixed_kv.paper_comparison --suite joint --scale 2 --io direct \
+  --offered-gib-s 0.10 --corpus "$out/corpus" --output "$out/joint/direct"
+tar -czf "$out/joint-results.tar.gz" -C "$out/joint" buffered direct
+python3 -m scripts.mixed_kv.summarize_mechanisms --suite joint "$out/joint-results.tar.gz" \
+  --output "$out/joint-summary"
+~~~

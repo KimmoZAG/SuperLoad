@@ -6,6 +6,8 @@ Ascend 910B2 上的 KV Cache 存储加载基准。两种确定性负载分别模
 
 [混合负载结果](https://kimmozag.github.io/SuperLoad/#mixed-workloads) 并列展示 LRU、Strata、Bidaw 和 SolidAttention 的前缀及稀疏回载 P95。分轮汇总记录在 [mixed-results.csv](report/mixed-results.csv)，复跑命令和排队诊断见 [混合回放实验](docs/mixed-kv.md)。
 
+[联合切分与四方案对照](report/results/joint-four-baselines/README.md) 提供单机昇腾的 P95 汇总、逐种子对比和 30 轮原始记录。
+
 ## 快速运行
 
 在 Linux 下用 Python 3.10+。真实 HBM 测量需要 Ascend 驱动和 CANN。

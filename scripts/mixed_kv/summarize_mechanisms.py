@@ -8,6 +8,7 @@ from collections import defaultdict
 from pathlib import Path
 from statistics import median
 
+from .paper_comparison import JOINT_COMPARISON
 from .summarize import quantile
 
 
@@ -37,18 +38,30 @@ def validate(mode, row):
     assert all(
         r["arrival_ns"] <= r["first_ns"] <= r["ready_ns"] <= totals["wall_ns"] for r in requests
     )
-    assert sorted(i for s in stage for i in s["request_ids"]) == sorted(r["id"] for r in requests)
     assert totals["logical_bytes"] == sum(len(r["pages"]) for r in requests) * page
     assert totals["hbm_bytes"] == totals["logical_bytes"] - totals["shared_transfers_saved"] * page
-    assert sum(s["hbm_bytes"] for s in stage) == totals["hbm_bytes"]
-    assert (
-        sum(s["storage_bytes"] for s in stage) + totals.get("prefetch_bytes", 0)
-        == totals["storage_bytes"]
-    )
-    assert (
-        sum(s["read_calls"] for s in stage) + totals.get("prefetch_calls", 0)
-        == totals["read_calls"]
-    )
+    if row["scheme"] == "joint":
+        assert totals["storage_bytes"] == totals["hbm_bytes"]
+        intervals = row["stage_intervals"]
+        for phase, key in (("read", "disk_ns"), ("h2d", "h2d_ns")):
+            times = [(a, b) for _, name, a, b in intervals if name == phase]
+            assert all(a <= b for a, b in times)
+            assert all(a[1] <= b[0] for a, b in zip(times, times[1:]))
+            assert sum(b - a for a, b in times) == totals[key]
+        assert sum(phase == "h2d" for _, phase, _, _ in intervals) == totals["copies"]
+    else:
+        assert sorted(i for s in stage for i in s["request_ids"]) == sorted(
+            r["id"] for r in requests
+        )
+        assert sum(s["hbm_bytes"] for s in stage) == totals["hbm_bytes"]
+        assert (
+            sum(s["storage_bytes"] for s in stage) + totals.get("prefetch_bytes", 0)
+            == totals["storage_bytes"]
+        )
+        assert (
+            sum(s["read_calls"] for s in stage) + totals.get("prefetch_calls", 0)
+            == totals["read_calls"]
+        )
     assert totals["verified_pages"] > 0
     assert all(len(s["pages"]) * page <= row["staging_bytes"] for s in stage)
     if mode == "hbm-smoke":
@@ -95,8 +108,10 @@ def summarize(key, rows):
     ):
         result[key] = median(r["counts"].get(key, 0) for r in rows)
     for key in ("disk_ns", "h2d_ns"):
-        result[key[:-3] + "_ms_per_submission"] = median(
-            r["counts"][key] / len(r["submissions"]) / 1e6 for r in rows
+        result[key[:-3] + "_ms_per_submission"] = (
+            None
+            if rows[0]["scheme"] == "joint"
+            else median(r["counts"][key] / len(r["submissions"]) / 1e6 for r in rows)
         )
     return result
 
@@ -104,7 +119,9 @@ def summarize(key, rows):
 def comparisons(grouped):
     for (mode, scenario, scheme), cases in sorted(grouped.items()):
         controls = ["native"]
-        if scheme in ("strata", "bidaw", "solid"):
+        if scheme == "joint":
+            controls = JOINT_COMPARISON[:-1]
+        elif scheme in ("strata", "bidaw", "solid"):
             controls.append(
                 {"strata": "strata-io", "bidaw": "native-lru", "solid": "solid-io"}[scheme]
             )
@@ -157,6 +174,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("archive", type=Path)
     ap.add_argument("--output", type=Path, required=True)
+    ap.add_argument("--suite", choices=("mechanisms", "joint"), default="mechanisms")
     args = ap.parse_args()
     groups = defaultdict(dict)
     traces = {}
@@ -169,10 +187,30 @@ def main():
         key = (mode, row["scenario"], row["scheme"])
         assert row["seed"] not in groups[key]
         groups[key][row["seed"]] = row
-        trace = tuple((r["profile"], r["arrival_ns"], r["pages"]) for r in row["requests"])
-        trace_key = (row["scenario"], row["seed"])
-        assert traces.setdefault(trace_key, trace) == trace
-    assert counts == {"buffered": 69, "direct": 24, "hbm-smoke": 3}, counts
+        requests = tuple(
+            (r["id"], r["profile"], r["arrival_ns"], r["pages"]) for r in row["requests"]
+        )
+        configuration = tuple(
+            row[field]
+            for field in (
+                "nominal_gib_s",
+                "page_bytes",
+                "staging_bytes",
+                "cache_budget_bytes",
+                "arena_bytes",
+            )
+        )
+        trace_key = (mode if args.suite == "joint" else None, row["scenario"], row["seed"])
+        signature = (requests, configuration)
+        assert traces.setdefault(trace_key, signature) == signature
+    if args.suite == "joint":
+        assert set(groups) == {
+            (mode, "mix-balanced", scheme)
+            for mode in ("buffered", "direct")
+            for scheme in JOINT_COMPARISON
+        }
+    else:
+        assert counts == {"buffered": 69, "direct": 24, "hbm-smoke": 3}, counts
     assert all(set(group) == {42, 43, 44} for group in groups.values())
     save(
         args.output / "metrics.csv",

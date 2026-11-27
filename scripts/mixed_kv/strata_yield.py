@@ -7,6 +7,7 @@ import time
 from collections import Counter, deque
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import ExitStack
+from dataclasses import asdict
 from pathlib import Path
 
 from superload.benchmark.metrics import percentile
@@ -14,6 +15,7 @@ from superload.cli import write_json
 from superload.dataset.corpus import make_plan, open_corpus, page_bytes, read_manifest, read_spans
 from superload.hardware.device import Ascend, CPU, HostBuffer
 
+from .joint_schedule import JOINT_POLICIES, JointSchedule, calibrate
 from .trace import GIB, MIB, PREFIX, SPARSE, arrival_trace
 
 
@@ -279,6 +281,8 @@ def cases(suite):
         ]
     if suite == "pipeline":
         return [("mix-balanced", p) for p in PIPELINE_POLICIES]
+    if suite in ("joint", "joint-check"):
+        return [("mix-balanced", p) for p in ("strata", *JOINT_POLICIES)]
     return [("mix-sparse-heavy", p) for p in PIPELINE_POLICIES]
 
 
@@ -297,6 +301,8 @@ def main():
             "direct-confirm",
             "pipeline",
             "robustness",
+            "joint",
+            "joint-check",
         ),
         required=True,
     )
@@ -319,6 +325,11 @@ def main():
         fd = open_corpus(args.corpus, "page-first", spec, args.io)
         stack.callback(os.close, fd)
         reader = stack.enter_context(ThreadPoolExecutor(max_workers=1))
+        costs = None
+        if args.suite in ("joint", "joint-check"):
+            setup = Trial((), fd, spec, device, base, staging, "strata", args.quantum, reader)
+            costs = calibrate(setup)
+            print("calibrated costs (ns)", asdict(costs), flush=True)
         for seed in args.seeds:
             schedule = cases(args.suite)
             random.Random(seed).shuffle(schedule)
@@ -337,8 +348,14 @@ def main():
                 )
                 trial = Trial(trace, fd, spec, device, base, staging, policy, args.quantum, reader)
                 print(args.io, seed, scenario, policy, flush=True)
-                wall = trial.run()
-                row = trial.result(wall, corpus_seed, args.suite in ("check", "pipeline-check"))
+                if policy in JOINT_POLICIES:
+                    wall = JointSchedule(
+                        trial, costs, SLOT_PAGES - SPARSE_SLOT_PAGES, SPARSE_SLOT_PAGES
+                    ).run()
+                else:
+                    wall = trial.run()
+                full = args.suite in ("check", "pipeline-check", "joint-check")
+                row = trial.result(wall, corpus_seed, full)
                 row.update(
                     io=args.io,
                     scenario=scenario,
@@ -350,6 +367,8 @@ def main():
                     scale=args.scale,
                     backend="cpu" if args.device == "cpu" else "ascend",
                 )
+                if costs is not None:
+                    row["costs_ns"] = asdict(costs)
                 write_json(row, args.output / f"{seed}.{scenario}.{policy}.json")
                 print(f"  {row['logical_gib_s']:.3f} GiB/s", row["classes"], flush=True)
 

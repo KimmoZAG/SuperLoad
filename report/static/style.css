@@ -38,6 +38,154 @@ h1 { font-size: clamp(1.95rem, 4.65vw, 3.45rem); letter-spacing: -.045em; margin
 h2 { font-size: clamp(1.45rem, 3.4vw, 2rem); letter-spacing: -.03em; margin-bottom: .7rem; }
 h3 { font-size: 1.15rem; margin-bottom: .5rem; }
 
+.research-poster {
+  --signal: #7458ad;
+  --signal-light: #e6ddf6;
+  --large-block: #e3ede9;
+  --poster-border: #d6e3df;
+}
+.poster-opening, .poster-evidence {
+  display: grid;
+  grid-template-columns: minmax(0, 1.12fr) minmax(0, 1fr);
+  gap: clamp(.75rem, 2.1vw, 1.45rem);
+}
+.poster-intro {
+  align-self: center;
+  padding: clamp(.35rem, 1.6vw, 1.25rem) 0;
+}
+.poster-context {
+  color: var(--link);
+  font-size: .85rem;
+  font-weight: 720;
+  margin: 0 0 .8rem;
+}
+.poster-intro h1 {
+  font-size: clamp(2.05rem, 4.45vw, 3.6rem);
+  font-weight: 800;
+  margin: 0;
+}
+.poster-question {
+  max-width: 27rem;
+  margin: .9rem 0 1.05rem;
+  color: var(--muted);
+  font-size: clamp(.98rem, 1.55vw, 1.12rem);
+}
+.reload-path {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .45rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: #294b43;
+  font: 640 .79rem/1.35 "Inter", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+}
+.reload-path li {
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  white-space: nowrap;
+}
+.reload-path li + li::before { content: "→"; color: #587970; }
+.poster-results, .poster-flow, .poster-motivation { border-radius: .85rem; min-width: 0; }
+.poster-results {
+  background: var(--dark);
+  color: #f4faf8;
+  padding: clamp(1rem, 2.6vw, 1.7rem);
+  font-variant-numeric: tabular-nums;
+}
+.poster-results h2 { font-size: 1.12rem; margin: 0 0 .8rem; color: #e2f3ec; }
+.result-bars { display: grid; gap: .62rem; padding: 0; margin: 0 0 .9rem; list-style: none; }
+.result-bar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: .2rem .65rem;
+  font-size: .9rem;
+}
+.result-bar strong { font-size: clamp(1.6rem, 3.2vw, 2.55rem); line-height: 1; }
+.poster-results small { font-size: .58em; font-weight: 615; }
+.result-bar-superload strong { color: var(--mint); }
+.result-track { grid-column: 1/-1; height: .43rem; background: #39534f; border-radius: 1rem; }
+.result-track > span { display: block; width: var(--bar-width); height: 100%; background: #adcbc2; border-radius: inherit; }
+.result-bar-superload .result-track > span { background: var(--mint); }
+.poster-tradeoffs {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  display: grid;
+  gap: .48rem .8rem;
+  border-top: 1px solid #466059;
+  margin: 0;
+  padding: .69rem 0;
+}
+.poster-tradeoffs dt { color: #c4dbd4; font-size: .77rem; }
+.poster-tradeoffs dd { margin: .13rem 0 0; font-size: clamp(.87rem, 1.4vw, 1rem); font-weight: 670; }
+.result-context { color: #bfe6d6; font-size: .755rem; text-underline-offset: .2em; }
+
+.poster-evidence { margin-top: clamp(.75rem, 2.1vw, 1.45rem); }
+.poster-flow, .poster-motivation {
+  border: 1px solid var(--poster-border);
+  padding: clamp(.9rem, 2.25vw, 1.4rem);
+}
+.poster-flow { background: var(--surface); }
+.poster-flow h2, .poster-motivation h2, .poster-mechanisms h2 { font-size: clamp(1.05rem, 2.3vw, 1.4rem); margin-bottom: .75rem; }
+.timeline {
+  --lane-start: 6.75rem;
+  position: relative;
+  display: grid;
+  gap: .48rem;
+  padding-top: 1.25rem;
+}
+.timeline-arrival {
+  position: absolute;
+  inset: .95rem auto 0 calc(var(--lane-start) + (100% - var(--lane-start)) * .24);
+  z-index: 1;
+  border-inline-start: 1px dashed var(--signal);
+  pointer-events: none;
+}
+.timeline-arrival span {
+  position: absolute;
+  bottom: 100%;
+  left: -.2rem;
+  color: #573a85;
+  font-size: .71rem;
+  font-weight: 660;
+  white-space: nowrap;
+}
+.timeline-row {
+  display: grid;
+  grid-template-columns: 6.3rem minmax(0, 1fr);
+  gap: .45rem;
+  align-items: center;
+  font-size: .81rem;
+  font-weight: 670;
+}
+.timeline-lane { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .22rem; }
+.timeline-fifo .large-slot { grid-column: span 4; }
+.timeline-lane b { padding: .34rem .08rem; border-radius: .32rem; text-align: center; }
+.large-slot { background: var(--large-block); color: #284b40; }
+.small-slot { background: var(--signal-light); color: #493372; border: 1px solid #ccb9ec; }
+.timeline-caption { margin: .65rem 0 0; color: var(--muted); font-size: .78rem; }
+.poster-motivation { background: #f4f1fb; border-color: #e1d8f3; }
+.motivation-value { display: block; font-size: clamp(2rem, 4.5vw, 2.9rem); color: #553c88; line-height: 1; }
+.motivation-value span { font-size: .58em; }
+.poster-motivation p { margin: .42rem 0; color: #4d4264; font-size: .88rem; }
+.poster-motivation a { color: #573a85; font-size: .8rem; text-underline-offset: .17em; }
+
+.poster-mechanisms { margin-top: clamp(1rem, 2.75vw, 1.7rem); }
+.mechanism-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+.mechanism-grid article { padding: .6rem 0 0 .8rem; border-left: 2px solid #9abbb1; }
+.mechanism-grid article:last-child { border-color: var(--signal); }
+.mechanism-grid h3 { font-size: .9rem; margin: 0 0 .27rem; }
+.mechanism-grid p { margin: 0; font-size: .83rem; color: var(--muted); }
+.poster-details { margin-top: 1.1rem; }
+.poster-details summary { cursor: pointer; width: fit-content; color: var(--link); font-size: .87rem; font-weight: 660; }
+.poster-details .overview-chapters { margin-top: .65rem; }
+
 .overview-chapters { display: grid; gap: .75rem; max-width: 54rem; }
 .overview-chapter {
   min-width: 0;
@@ -62,6 +210,8 @@ h3 { font-size: 1.15rem; margin-bottom: .5rem; }
 .figure-stack { display: grid; grid-template-columns: minmax(0, 1fr); gap: .8rem; }
 @media (max-width: 48rem) {
   .frame { width: min(100% - 2rem, 70rem); }
+  .poster-opening, .poster-evidence, .mechanism-grid { grid-template-columns: minmax(0, 1fr); }
+  .mechanism-grid { gap: .75rem; }
 }
 @media (max-width: 35rem) {
   .top-inner { flex-wrap: wrap; padding-block: .55rem; gap: .42rem .8rem; }

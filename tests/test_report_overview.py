@@ -1,7 +1,7 @@
 import unittest
 from textwrap import dedent
 
-from report.overview import render_overview
+from report.overview import render_overview, render_poster_results
 
 
 class RenderOverviewTest(unittest.TestCase):
@@ -42,3 +42,23 @@ class RenderOverviewTest(unittest.TestCase):
         self.assertIn('href="https://example.org/paper"', content)
         self.assertIn('src="https://example.org/chart.svg"', content)
         self.assertIn('alt="Figure"', content)
+
+    def test_poster_uses_the_late_arrival_direct_measurement_for_both_bars(self):
+        measurements = {
+            "fifo": {
+                "small_p95": {"median": 4000}, "large_p95": {"median": 3800}, "gib_s": {"median": 0.14},
+            },
+            "chunk-rr": {
+                "small_p95": {"median": 500}, "large_p95": {"median": 4500}, "gib_s": {"median": 0.13},
+            },
+        }
+        summary = {"measurements": {"direct": {"gaps": {25: measurements}, "pairs": 20, "repeat": 2}}}
+
+        poster = render_poster_results(summary)
+
+        self.assertIn("4.00 <small>s</small>", poster)
+        self.assertIn("0.50 <small>s</small>", poster)
+        self.assertIn("--bar-width:12.500%", poster)
+        self.assertIn("3.80 → 4.50", poster)
+        self.assertIn("0.140 → 0.130", poster)
+        self.assertIn("20 对 × 2 轮", poster)

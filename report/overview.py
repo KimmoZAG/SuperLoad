@@ -35,3 +35,35 @@ def render_overview(source):
         body = markdown.renderer.render(chapter, markdown.options, {})
         chapters.append(f'<article class="overview-chapter">\n{body}</article>')
     return "\n".join(chapters)
+
+
+def render_poster_results(summary):
+    direct = summary["measurements"]["direct"]
+    cases = direct["gaps"][25]
+    fifo = cases["fifo"]
+    superload = cases["chunk-rr"]
+    longest = max(row["small_p95"]["median"] for row in (fifo, superload))
+    small_rows = []
+    for style, title, values in (("fifo", "原生 FIFO", fifo), ("superload", "SuperLoad", superload)):
+        latency = values["small_p95"]["median"]
+        small_rows.append(
+            f'<li class="result-bar result-bar-{style}">'
+            f'<span>{title}</span><strong>{latency / 1000:.2f} <small>s</small></strong>'
+            f'<span class="result-track" aria-hidden="true">'
+            f'<span style="--bar-width:{100 * latency / longest:.3f}%"></span></span></li>'
+        )
+    large_before = fifo["large_p95"]["median"] / 1000
+    large_after = superload["large_p95"]["median"] / 1000
+    throughput_before = fifo["gib_s"]["median"]
+    throughput_after = superload["gib_s"]["median"]
+    return (
+        '<section class="poster-results" aria-labelledby="poster-results-title">'
+        '<h2 id="poster-results-title">小回载 P95</h2>'
+        f'<ul class="result-bars">{"".join(small_rows)}</ul>'
+        '<dl class="poster-tradeoffs">'
+        f'<div><dt>大回载 P95</dt><dd>{large_before:.2f} → {large_after:.2f} <small>s</small></dd></div>'
+        f'<div><dt>双请求吞吐</dt><dd>{throughput_before:.3f} → {throughput_after:.3f} '
+        '<small>GiB/s</small></dd></div></dl>'
+        '<a class="result-context" href="#comparison">Direct I/O · 大回载早到 25 ms · '
+        f'{direct["pairs"]} 对 × {direct["repeat"]} 轮</a></section>'
+    )

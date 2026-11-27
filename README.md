@@ -44,7 +44,7 @@ python3 -m unittest discover -s tests -v
 python3 report/build.py --comparison-results runs/compare
 ```
 
-默认构建使用两份固定的 GitHub Release 附件，并校验 SHA-256。网页的研究概览由 [overview.md](overview.md) 中已填写的章节生成。输出位于 `build/site/`。用 `--comparison-results` 或 `--prefix-results` 可预览本地复测。反复构建同一输出目录时，构建会清理已退役的旧图和静态文件。
+默认构建使用两份固定的 GitHub Release 附件，并校验 SHA-256。网页首屏海报的实测指标来自方法对照，展开区从 [overview.md](overview.md) 同步已填写的章节。输出位于 `build/site/`。用 `--comparison-results` 或 `--prefix-results` 可预览本地复测。反复构建同一输出目录时，构建会清理已退役的旧图和静态文件。
 
 发布方法对照时，将 `plan.json`、`buffered.json` 和 `direct.json` 放在 ZIP 根目录，可附环境记录。发布后更新 `report/comparison-results-release.json` 的标签、文件名和 SHA-256。重新发布问题验证时，更新 `report/prefix-results-release.json`。运行 `python3 report/build.py` 检查固定附件与网页，再推送 `main` 触发 Pages 部署。
 

@@ -48,6 +48,15 @@ def figure(directory, name, alt):
     )
 
 
+def arrival_figures(directory, name, description):
+    return "".join(
+        f"<article><h3>{comparison.GAPS[gap]}</h3>"
+        + figure(directory, f"{name}-{gap}ms", f"{comparison.GAPS[gap]} · {description}")
+        + "</article>"
+        for gap in (25, 0)
+    )
+
+
 def load(module, manifest, override):
     if override:
         return (*module.read(override), None)
@@ -96,6 +105,7 @@ def main():
     figures = args.output / "figures"
     prefix.render(summary, runs, figures)
     comparison.render(compare_summary, figures)
+    direct_ablation.render(ablation_summary, figures)
 
     assets = args.output / "assets"
     assets.mkdir(parents=True, exist_ok=True)
@@ -108,14 +118,11 @@ def main():
             json.dumps(data, indent=2, ensure_ascii=False, allow_nan=False) + "\n", encoding="utf-8",
         )
     template = (STATIC / "index.html").read_text(encoding="utf-8")
-    charts = "".join(
-        f'<article><h3>{comparison.GAPS[gap]}</h3>'
-        + figure(
-            figures, f"method-comparison-{gap}ms",
-            f"{comparison.GAPS[gap]} · 五种方法对照，延迟越低越好，吞吐越高越好",
-        )
-        + '</article>'
-        for gap in (25, 0)
+    charts = arrival_figures(figures, "method-comparison", "五种方法对照，延迟越低越好，吞吐越高越好")
+    ablation_charts = arrival_figures(
+        figures, "direct-io-ablation",
+        "Direct I/O 下普通主机缓冲和 CANN 锁页路径的三种调度方法。"
+        "对照 8–32 MiB 与 ≥128 MiB 的 HBM 就绪 P95 和双请求吞吐。",
     )
     prefix_chart = figure(figures, "tool-agent-prefix", "两组请求的共现率与低回载量组就绪延迟")
     overview = render_overview((ROOT / "overview.md").read_text(encoding="utf-8"))
@@ -125,7 +132,7 @@ def main():
               .replace("@@LOW_RELOAD_RANGE@@", LOW_RELOAD_RANGE)
               .replace("@@HIGH_RELOAD_RANGE@@", HIGH_RELOAD_RANGE)
               .replace("@@COMPARISON@@", charts)
-              .replace("@@DIRECT_ABLATION@@", direct_ablation.render(ablation_summary))
+              .replace("@@DIRECT_ABLATION@@", ablation_charts)
               .replace("@@DIRECT_ABLATION_DOWNLOAD@@", download_link(ablation_release, "补测原始 ZIP"))
               .replace("@@PREFIX_DOWNLOAD@@", download_link(release, "问题验证原始 ZIP"))
               .replace("@@COMPARISON_DOWNLOAD@@", download_link(compare_release, "对照原始 ZIP")))

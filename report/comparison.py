@@ -7,10 +7,7 @@ from collections import defaultdict
 from itertools import product
 from statistics import median
 
-from figures import HIGH_RELOAD_RANGE, LOW_RELOAD_RANGE, MODES, panel_title, save
-from matplotlib import pyplot as plt
-from matplotlib.lines import Line2D
-from matplotlib.ticker import LogLocator, NullFormatter, ScalarFormatter
+from figures import MODES, render_reload_panels
 from prefix import p95
 
 
@@ -110,58 +107,7 @@ def summarize(plan, runs):
 
 
 def render(summary, output):
-    render_layout(summary, output, mobile=False)
-    render_layout(summary, output, mobile=True)
-
-
-def render_layout(summary, output, *, mobile):
-    modes = summary["measurements"]
-    columns = (
-        ("small_p95", f"{LOW_RELOAD_RANGE} P95"),
-        ("large_p95", f"{HIGH_RELOAD_RANGE} P95"),
-        ("gib_s", "Throughput"),
-    )
     for gap in GAPS:
-        if mobile:
-            fig, axes = plt.subplots(6, 1, figsize=(5.2, 15.5))
-            fig.subplots_adjust(left=0.29, right=0.96, top=0.96, bottom=0.085, hspace=1.05)
-        else:
-            fig, axes = plt.subplots(2, 3, figsize=(11.4, 5.75), sharex="col", sharey=True)
-            fig.subplots_adjust(left=0.135, right=0.982, top=0.90, bottom=0.19, hspace=0.42, wspace=0.29)
-        for col, (metric, label) in enumerate(columns):
-            points = [v for mode in modes.values() for m in METHODS
-                      for v in mode["gaps"][gap][m][metric]["trials"]]
-            latency = metric != "gib_s"
-            axis_label = "KV-ready latency (ms, log)" if latency else "Pair throughput (GiB/s)"
-            direction = "← Lower is better" if latency else "Higher is better →"
-            for i, mode in enumerate(("buffered", "direct")):
-                index = 2 * col + i if mobile else 3 * i + col
-                ax = axes.flat[index]
-                panel_title(ax, "ABCDEF"[index], f"{MODES[mode]} · {label}")
-                if latency:
-                    ax.set_xscale("log")
-                    ax.set_xlim(min(points) * 0.8, max(points) * 1.2)
-                    ax.xaxis.set_major_locator(LogLocator(base=10, subs=(1, 3)))
-                    ax.xaxis.set_major_formatter(ScalarFormatter())
-                    ax.xaxis.set_minor_formatter(NullFormatter())
-                else:
-                    ax.set_xlim(0, max(points) * 1.10)
-                ax.set_xlabel(f"{axis_label}\n{direction}" if i == 1 or mobile else direction)
-                ax.set_yticks(range(len(METHODS)), [name for name, _ in METHODS.values()])
-                ax.set_ylim(len(METHODS) - 0.5, -0.5)
-                ax.grid(axis="x")
-                for j, (method, (_, color)) in enumerate(METHODS.items()):
-                    stats = modes[mode]["gaps"][gap][method][metric]
-                    values = stats["trials"]
-                    ax.hlines(j, min(values), max(values), color=color, linewidth=1.4, alpha=0.65)
-                    offsets = [j + (n - (len(values) - 1) / 2) * 0.19 for n in range(len(values))]
-                    ax.scatter(values, offsets, facecolors="white", edgecolors=color, s=24, zorder=3)
-                    ax.scatter(stats["median"], j, color=color, marker="D", s=28, zorder=4)
-        legend = [
-            Line2D([], [], marker="D", color="#4d5c64", ls="none", label="Median across trials"),
-            Line2D([], [], marker="o", markerfacecolor="white", color="#4d5c64", ls="none",
-                   label="Individual trial"),
-        ]
-        fig.legend(handles=legend, loc="lower center", bbox_to_anchor=(0.53, 0.025), ncol=2, frameon=False)
-        suffix = "-mobile" if mobile else ""
-        save(fig, output, f"method-comparison-{gap}ms{suffix}", pdf=not mobile)
+        groups = {label: summary["measurements"][mode]["gaps"][gap] for mode, label in MODES.items()}
+        for mobile in (False, True):
+            render_reload_panels(groups, METHODS, output, f"method-comparison-{gap}ms", mobile=mobile)

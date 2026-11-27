@@ -1,21 +1,21 @@
-"""Summarize the matched Direct I/O ablation and render its result tables."""
+"""Summarize the matched Direct I/O ablation and render its result figures."""
 
 import hashlib
 import json
 from itertools import product
 from statistics import mean, median
 
-from figures import HIGH_RELOAD_RANGE, LOW_RELOAD_RANGE
+from comparison import GAPS, METHODS as COMPARISON_METHODS
+from figures import render_reload_panels
 from prefix import p95
 
 
-GAPS = {0: "同时到达", 25: "高回载量请求早到 25 ms"}
 METHODS = {
-    "fifo": "原生 FIFO（整请求）",
-    "chunk-fifo": "16 MiB 分块 FIFO",
-    "chunk-rr": "SuperLoad",
+    "fifo": ("Native FIFO", COMPARISON_METHODS["fifo"][1]),
+    "chunk-fifo": ("16 MiB chunk FIFO", "#0072B2"),
+    "chunk-rr": COMPARISON_METHODS["chunk-rr"],
 }
-BUFFERS = {"pageable": "普通主机缓冲", "pinned": "CANN 锁页路径"}
+BUFFERS = {"pageable": "Pageable", "pinned": "CANN pinned"}
 
 
 def read(directory):
@@ -116,42 +116,25 @@ def summarize(run, page_bytes):
     return result
 
 
-def render_table(summary, gap):
-    settings = summary["gaps"][gap]["settings"]
-    groups = []
-    for buffer, label in BUFFERS.items():
-        rows = [f'<tr class="ablation-group"><th scope="rowgroup" colspan="4">{label}</th></tr>']
-        for method, name in METHODS.items():
-            row = settings[f"{buffer}/{method}"]["median"]
-            low = f'{row["small_p95_ms"]:,.0f}'
-            if method == "chunk-rr":
-                low = f"<strong>{low}</strong>"
-            rows.append(
-                f'<tr><th scope="row">{name}</th><td>{low}</td>'
-                f'<td>{row["large_p95_ms"]:,.0f}</td><td>{row["throughput_gib_s"]:.4f}</td></tr>'
+def render(summary, output):
+    metrics = {
+        "small_p95": "small_p95_ms",
+        "large_p95": "large_p95_ms",
+        "gib_s": "throughput_gib_s",
+    }
+    for gap in GAPS:
+        settings = summary["gaps"][gap]["settings"]
+        groups = {}
+        for buffer, label in BUFFERS.items():
+            groups[label] = methods = {}
+            for method in METHODS:
+                row = settings[f"{buffer}/{method}"]
+                methods[method] = {
+                    metric: {"trials": [trial[key] for trial in row["trials"]], "median": row["median"][key]}
+                    for metric, key in metrics.items()
+                }
+        for mobile in (False, True):
+            render_reload_panels(
+                groups, METHODS, output, f"direct-io-ablation-{gap}ms",
+                mobile=mobile, log_metrics=("small_p95",),
             )
-        groups.append("<tbody>" + "".join(rows) + "</tbody>")
-    return (
-        f'<table class="ablation-table"><caption>{GAPS[gap]}</caption><thead><tr>'
-        f'<th scope="col">方法</th><th scope="col">{LOW_RELOAD_RANGE}<br>P95（ms）↓</th>'
-        f'<th scope="col">{HIGH_RELOAD_RANGE}<br>P95（ms）↓</th>'
-        '<th scope="col">吞吐<br>（GiB/s）↑</th></tr></thead>'
-        + "".join(groups) + "</table>"
-    )
-
-
-def render(summary):
-    settings = summary["gaps"][25]["settings"]
-    reductions = []
-    for buffer in BUFFERS:
-        fifo = settings[f"{buffer}/chunk-fifo"]["median"]
-        superload = settings[f"{buffer}/chunk-rr"]["median"]
-        reductions.append(100 * (1 - superload["small_p95_ms"] / fifo["small_p95_ms"]))
-    return (
-        '<p class="ablation-takeaway">高回载量请求早到 25 ms 时，相比 16 MiB 分块 FIFO，'
-        f'普通主机缓冲和 CANN 锁页路径下的低回载量组 P95 分别下降 '
-        f'<strong>{reductions[0]:.1f}%</strong> 和 <strong>{reductions[1]:.1f}%</strong>。</p>'
-        + render_table(summary, 25)
-        + '<details class="ablation-details"><summary>查看同时到达的结果</summary>'
-        + render_table(summary, 0) + '</details>'
-    )

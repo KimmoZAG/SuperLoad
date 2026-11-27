@@ -108,8 +108,7 @@
     </section>
     <section id="direct-io-ablation" aria-labelledby="direct-io-ablation-title">
       <h2 id="direct-io-ablation-title">Direct I/O 分块与锁页对照</h2>
-      <p class="ablation-context">在昇腾 910B2 上复用 20 对 Direct I/O 请求，每种条件测两轮。CANN 锁页路径包含普通缓冲到锁页缓冲的 CPU 中转。</p>
-      @@DIRECT_ABLATION@@
+      <div class="figure-stack">@@DIRECT_ABLATION@@</div>
       <div class="resources">
         <a href="assets/direct-ablation-summary.json" download>两种到达条件汇总 JSON</a>
         @@DIRECT_ABLATION_DOWNLOAD@@

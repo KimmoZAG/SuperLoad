@@ -39,4 +39,4 @@ python3 -m superload prefix-bench --plan runs/prefix/plan.json --corpus data/pre
   --io direct --repeat 2 --pair-limit 16 --storage-label longhorn-ext4 --output runs/prefix/direct.json
 ```
 
-网页图表由 [报告构建](../report/build.py) 从固定附件生成。[实验数据 Release](https://github.com/KimmoZAG/SuperLoad/releases/tag/results-prefix-910b2-2026-11-27)
+问题验证的结果文件固定在 [Release 清单](../report/prefix-results-release.json)，由 [报告构建](../report/build.py) 读取并校验。[网页图与汇总](https://kimmozag.github.io/SuperLoad/#prefix-contention) · [实验数据 Release](https://github.com/KimmoZAG/SuperLoad/releases/tag/results-prefix-910b2-2026-11-27)

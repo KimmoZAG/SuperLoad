@@ -15,7 +15,7 @@
 | 原生 FIFO | 按到达顺序整请求读取，文件使用 layer-major 布局。完成同步 H2D 后再处理下一请求。 |
 | Bidaw | 已知存储缺页量，用等待时间除以回载块数决定待服务请求的 Disk-HRRN 优先级。缓存模型固定，测量范围为论文的存储队列排序。 [论文 §3.2](https://www.usenix.org/system/files/fast26-hu-shipeng.pdf) |
 | Strata I/O | 使用 page-first 布局，按文件页位置排序并合并相邻读，按 FIFO 处理。共享页和模型批调度需要相应的工作负载。 [论文](https://www.usenix.org/conference/osdi26/presentation/xie-zhiqiang) |
-| Libra 流水 | 保留 FIFO，在请求内切成 16 MiB 块，两个 DRAM 缓冲交替工作。主线程将当前块拷入 HBM，读线程并行读下一块。移植论文按块重叠传输的机制，计算阶段对应这里的文件读取。 [论文 §4.3](https://www.usenix.org/system/files/nsdi26-ruan-libra.pdf) |
+| Libra 流水 | 保留 FIFO，在请求内切成 16 MiB 块，两个 DRAM 缓冲交替工作。将论文的计算与跨实例 KV 传输流水移植到本机读文件和 H2D 两阶段。主线程拷入当前块，读线程并行读下一块。 [论文 §4.3](https://www.usenix.org/system/files/nsdi26-ruan-libra.pdf) |
 | 固定分块轮转 | 使用与 Libra 相同的 16 MiB 块。每一块同步读入 DRAM 并拷入 HBM，然后在排队请求间轮转。在块结束时接纳本块执行期间到达的请求。 |
 
 ## 指标和解释范围
@@ -43,4 +43,4 @@
 - **流水重叠**。大回载早到时，Libra 在 Buffered 和 Direct 下分别将吞吐提高到 0.840 和 0.155 GiB/s。Direct 大回载的读阶段与 H2D 重叠时间中位数为 336 ms。请求级 FIFO 下，小回载仍需等待大回载结束。
 - **块边界轮转**。大回载早到时，轮转给小回载最短的就绪 P95。Direct 下同时观察到大回载 P95 从 3,916 ms 增至 4,775 ms，双请求吞吐从 0.124 降至 0.112 GiB/s。
 
-[运行命令](../README.md#运行方法对照) · [逐请求原始测量](https://github.com/KimmoZAG/SuperLoad/releases/tag/results-comparison-910b2-2026-11-27)
+[运行命令](../README.md#运行方法对照) · [网页对照图与汇总](https://kimmozag.github.io/SuperLoad/#comparison) · [逐请求原始测量](https://github.com/KimmoZAG/SuperLoad/releases/tag/results-comparison-910b2-2026-11-27)

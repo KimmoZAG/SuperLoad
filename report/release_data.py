@@ -26,10 +26,6 @@ class ResultsRelease:
         return cls(**json.loads(manifest.read_text(encoding="utf-8")))
 
     @property
-    def page_url(self):
-        return f"{RELEASES}/tag/{quote(self.tag, safe='')}"
-
-    @property
     def asset_url(self):
         return f"{RELEASES}/download/{quote(self.tag, safe='')}/{quote(self.asset, safe='')}"
 

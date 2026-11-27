@@ -1,1 +1,1 @@
-"""Host memory, AscendCL, and native RoCE verbs bindings."""
+"""Aligned host memory, AscendCL, and the CPU verification backend."""

@@ -4,7 +4,7 @@ Ascend 910B2 上的 KV Cache 存储加载基准。两种确定性负载分别模
 
 [在线实验报告](https://kimmozag.github.io/SuperLoad/) · [实验方法与论文复现范围](docs/experiment.md) · [RoCE 运行说明](docs/roce.md) · [原始测量](https://github.com/KimmoZAG/SuperLoad/releases/tag/results-ascend-910b2-2026-11-26)
 
-[混合负载结果](https://kimmozag.github.io/SuperLoad/#mixed-workloads) 并列展示 LRU、Strata、Bidaw 和 SolidAttention 的前缀及稀疏回载 P95。分轮汇总记录在 [mixed-results.csv](report/mixed-results.csv)。
+[混合负载结果](https://kimmozag.github.io/SuperLoad/#mixed-workloads) 并列展示 LRU、Strata、Bidaw 和 SolidAttention 的前缀及稀疏回载 P95。分轮汇总记录在 [mixed-results.csv](report/mixed-results.csv)，复跑命令和排队诊断见 [混合回放实验](docs/mixed-kv.md)。
 
 ## 快速运行
 

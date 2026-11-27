@@ -15,6 +15,7 @@
       <nav aria-label="报告导航">
         <a href="#overview">研究概览</a>
         <a href="#comparison">方法对照</a>
+        <a href="#direct-io-ablation">分块与锁页</a>
         <a href="#prefix-contention">问题验证</a>
       </nav>
       <a class="repo" href="https://github.com/KimmoZAG/SuperLoad">GitHub</a>
@@ -103,6 +104,16 @@
         <a href="assets/comparison-summary.json" download>对照汇总 JSON</a>
         @@COMPARISON_DOWNLOAD@@
         <a href="https://github.com/KimmoZAG/SuperLoad/blob/main/docs/comparison.md">对照设置与结果解读</a>
+      </div>
+    </section>
+    <section id="direct-io-ablation" aria-labelledby="direct-io-ablation-title">
+      <h2 id="direct-io-ablation-title">Direct I/O 分块与锁页对照</h2>
+      <p class="ablation-context">在昇腾 910B2 上复用 20 对 Direct I/O 请求，每种条件测两轮。CANN 锁页路径包含普通缓冲到锁页缓冲的 CPU 中转。</p>
+      @@DIRECT_ABLATION@@
+      <div class="resources">
+        <a href="assets/direct-ablation-summary.json" download>两种到达条件汇总 JSON</a>
+        @@DIRECT_ABLATION_DOWNLOAD@@
+        <a href="https://github.com/KimmoZAG/SuperLoad/blob/main/docs/direct-io-ablation.md">实验设置与复现</a>
       </div>
     </section>
     <section id="prefix-contention" aria-labelledby="prefix-title">

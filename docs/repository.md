@@ -1,6 +1,6 @@
 # 仓库结构与清理记录
 
-SuperLoad 的当前实验包括 Agent 前缀回载的队首阻塞验证，以及同一负载上的五种方法对照。
+SuperLoad 的当前实验包括 Agent 前缀回载的队首阻塞验证，同一负载上的五种方法对照，以及 Direct I/O 分块与锁页补测。
 
 ## 当前文件
 
@@ -11,7 +11,8 @@ SuperLoad 的当前实验包括 Agent 前缀回载的队首阻塞验证，以及
 | 生成和读取 KV 语料 | [superload/dataset/geometry.py](../superload/dataset/geometry.py)、[superload/dataset/corpus.py](../superload/dataset/corpus.py)、[superload/schemes/local.py](../superload/schemes/local.py) |
 | 测量与 HBM 校验 | [superload/benchmark/prefix.py](../superload/benchmark/prefix.py)、[superload/benchmark/comparison.py](../superload/benchmark/comparison.py)、[superload/hardware/device.py](../superload/hardware/device.py) |
 | 运行论文机制对照 | [superload/schemes/bidaw.py](../superload/schemes/bidaw.py)、[superload/schemes/libra.py](../superload/schemes/libra.py)。Strata I/O 布局在 `dataset/corpus.py`，固定分块轮转在 `benchmark/comparison.py`。 |
-| 选择发布批次 | [report/prefix-results-release.json](../report/prefix-results-release.json)、[report/comparison-results-release.json](../report/comparison-results-release.json) |
+| Direct I/O 分块与锁页补测 | [实验说明与复现](direct-io-ablation.md)、[汇总代码](../report/direct_ablation.py) |
+| 选择发布批次 | [report/prefix-results-release.json](../report/prefix-results-release.json)、[report/comparison-results-release.json](../report/comparison-results-release.json)、[report/direct-ablation-results-release.json](../report/direct-ablation-results-release.json) |
 | 生成图表和网页 | [report/prefix.py](../report/prefix.py)、[report/comparison.py](../report/comparison.py)、[report/overview.py](../report/overview.py)、[report/build.py](../report/build.py)、[report/static/index.html](../report/static/index.html)、[report/static/style.css](../report/static/style.css) |
 | 测试与发布 | [tests/](../tests/)、[.github/workflows/pages.yml](../.github/workflows/pages.yml) |
 
@@ -32,4 +33,4 @@ SuperLoad 的当前实验包括 Agent 前缀回载的队首阻塞验证，以及
 
 ## 生成目录与发布
 
-`data/` 存放轨迹和 KV 语料，`runs/` 存放回放计划、原始测量及环境记录，`build/` 存放本地结果缓存和生成的网页。发布流程见 [README](../README.md#构建与发布)。Pages 由当前两份 Release 清单生成，通过独立入口提供 SVG、PDF、汇总 JSON 和原始 ZIP。
+`data/` 存放轨迹和 KV 语料，`runs/` 存放回放计划、原始测量及环境记录，`build/` 存放本地结果缓存和生成的网页。发布流程见 [README](../README.md#构建与发布)。Pages 由当前三份 Release 清单生成，通过独立入口提供 SVG、PDF、汇总 JSON 和原始 ZIP。

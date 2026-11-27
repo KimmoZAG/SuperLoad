@@ -14,6 +14,12 @@ Direct I/O 下，相比原生 FIFO，SuperLoad 将低回载量组的 P95 从 **4
 
 [完整图表](https://kimmozag.github.io/SuperLoad/#comparison) · [原始测量](https://github.com/KimmoZAG/SuperLoad/releases/tag/results-comparison-910b2-2026-11-27)
 
+## Direct I/O 补充对照
+
+在相同的 16 MiB 分块下，相比分块 FIFO，SuperLoad 在普通主机缓冲和 CANN 锁页路径下分别将低回载量组 P95 降低 **89.8%** 和 **89.2%**（高回载量请求早到 25 ms）。双请求吞吐分别下降 0.94% 和 0.34%。
+
+[在线结果](https://kimmozag.github.io/SuperLoad/#direct-io-ablation) · [实验设置与复现](docs/direct-io-ablation.md) · [原始测量](https://github.com/KimmoZAG/SuperLoad/releases/tag/results-direct-ablation-910b2-2026-11-28)
+
 ## 运行方法对照
 
 运行环境为 Linux、Python 3.10+ 和昇腾 910B2，设备测量需要 Ascend 驱动与 CANN。
@@ -44,7 +50,7 @@ python3 -m unittest discover -s tests -v
 python3 report/build.py --comparison-results runs/compare
 ```
 
-默认构建使用两份固定的 GitHub Release 附件，并校验 SHA-256。网页首屏海报的实测指标来自方法对照，展开区从 [overview.md](overview.md) 同步已填写的章节。输出位于 `build/site/`。用 `--comparison-results` 或 `--prefix-results` 可预览本地复测。反复构建同一输出目录时，构建会清理已退役的旧图和静态文件。
+默认构建使用三份固定的 GitHub Release 附件，并校验 SHA-256。网页首屏海报的实测指标来自方法对照，展开区从 [overview.md](overview.md) 同步已填写的章节。输出位于 `build/site/`。用 `--comparison-results`、`--prefix-results` 或 `--direct-ablation-results` 可预览对应的本地复测。反复构建同一输出目录时，构建会清理已退役的旧图和静态文件。
 
 发布方法对照时，将 `plan.json`、`buffered.json` 和 `direct.json` 放在 ZIP 根目录，可附环境记录。发布后更新 `report/comparison-results-release.json` 的标签、文件名和 SHA-256。重新发布问题验证时，更新 `report/prefix-results-release.json`。运行 `python3 report/build.py` 检查固定附件与网页，再推送 `main` 触发 Pages 部署。
 

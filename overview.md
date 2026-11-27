@@ -24,15 +24,14 @@
 
 ## Why existing works fail?（现有方法的局限性）
 
-在共享的存储至 HBM 加载路径上，大回载先占用通道时，随后到达的小回载会遇到队首阻塞。我们在单台昇腾 910B2 上进行配对回放，在每种 I/O 模式内对同一组请求对测量两种到达条件。两请求同时到达，或大回载提前 25 ms 到达。[配对实验](docs/comparison.md)
+大回载先占用共享 KV 回载通道时，后到的小回载可能长时间排队。下面比较四种方案在这一场景中的机制局限。
 
-**Bidaw 调整待发请求的顺序。** Disk-HRRN 根据等待时间和待回载 KV 量计算优先级。只要两个请求仍在待发队列中，调度器就有机会改变发出顺序。Direct I/O 下，两请求同时到达时，小回载 P95 从 FIFO 的 3,914 ms 降到 264 ms。大回载早到 25 ms 时，加载器已经在处理大回载，小回载 P95 为 3,956 ms，接近 FIFO 的 4,014 ms。[Bidaw §3.2](https://www.usenix.org/system/files/fast26-hu-shipeng.pdf)
+- **原生 FIFO** 按到达顺序逐个完成回载。小请求排在大请求后面时，必须等大请求完成，形成队首阻塞。
+- **Bidaw** 按等待时间和回载量对待发请求排序。只要大小请求都还在队列里，就有机会重排。大回载一旦发出，后到的小请求无法通过队列重排获得让行。[Bidaw §3.2](https://www.usenix.org/system/files/fast26-hu-shipeng.pdf)
+- **Strata I/O** 将同一页的各层 KV 连续存放，用更大的连续传输缩短回载时间。布局优化压缩了大回载占用通道的时间，小请求何时能获得通道仍由原有调度决定。[Strata §4.2.1](https://www.usenix.org/system/files/osdi26-xie-zhiqiang.pdf)
+- **Libra 流水** 通过分块重叠传输与计算，提高资源利用率。流水本身没有在块边界按回载等待时间切换请求的规则，因此较高的通道利用率依然可能伴随较长的小回载尾延迟。[Libra §4.2–4.3](https://www.usenix.org/system/files/nsdi26-ruan-libra.pdf)
 
-**Strata I/O 缩短文件读取。** Strata 的页优先布局将同一页的各层 KV 连续存放。我们将这种布局用到文件中，使相邻页可以合并读取。大回载早到时，Direct I/O 下小回载 P95 从 FIFO 的 4,014 ms 降到 1,529 ms。读取更快缩短了通道被占用的时间，按整请求服务的加载器仍在大回载完成后才接续小回载。[Strata §4.2.1](https://www.usenix.org/system/files/osdi26-xie-zhiqiang.pdf)
-
-**Libra 流水重叠读取和 H2D。** Libra 的推理系统结合了延迟感知组批和分块 KV 传输。我们的单机对照采用其分块重叠思路，在拷贝当前块时读取同一请求的下一块，并保留请求级 FIFO。大回载早到时，Buffered 的双请求吞吐从 FIFO 的 0.533 GiB/s 提高到 0.840 GiB/s，小回载 P95 分别为 1,201 和 1,229 ms。请求内流水可以提高吞吐，小回载仍需等待大回载完成。[Libra §4.2–4.3](https://www.usenix.org/system/files/nsdi26-ruan-libra.pdf)
-
-大回载启动后，晚到小回载的等待取决于加载器何时再次选择要服务的请求。在大回载完成之前提供让行机会，才能让小回载提前推进。选择让行边界时，还需要权衡大回载完成时间和双请求吞吐。
+要保护小回载的尾延迟，共享通道需要在大回载完成前有机会重新选择服务对象。
 
 ## What is your key idea?（核心思想）
 

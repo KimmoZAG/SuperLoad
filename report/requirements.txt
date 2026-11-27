@@ -1,1 +1,2 @@
+markdown-it-py==4.3.0
 matplotlib==3.10.8

@@ -12,7 +12,7 @@ SuperLoad 的当前实验包括 Agent 前缀回载的队首阻塞验证，以及
 | 测量与 HBM 校验 | [superload/benchmark/prefix.py](../superload/benchmark/prefix.py)、[superload/benchmark/comparison.py](../superload/benchmark/comparison.py)、[superload/hardware/device.py](../superload/hardware/device.py) |
 | 运行论文机制对照 | [superload/schemes/bidaw.py](../superload/schemes/bidaw.py)、[superload/schemes/libra.py](../superload/schemes/libra.py)。Strata I/O 布局在 `dataset/corpus.py`，固定分块轮转在 `benchmark/comparison.py`。 |
 | 选择发布批次 | [report/prefix-results-release.json](../report/prefix-results-release.json)、[report/comparison-results-release.json](../report/comparison-results-release.json) |
-| 生成图表和网页 | [report/prefix.py](../report/prefix.py)、[report/comparison.py](../report/comparison.py)、[report/build.py](../report/build.py)、[report/static/index.html](../report/static/index.html)、[report/static/style.css](../report/static/style.css) |
+| 生成图表和网页 | [report/prefix.py](../report/prefix.py)、[report/comparison.py](../report/comparison.py)、[report/overview.py](../report/overview.py)、[report/build.py](../report/build.py)、[report/static/index.html](../report/static/index.html)、[report/static/style.css](../report/static/style.css) |
 | 测试与发布 | [tests/](../tests/)、[.github/workflows/pages.yml](../.github/workflows/pages.yml) |
 
 ## 已退役的文件

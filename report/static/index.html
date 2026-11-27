@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="昇腾 910B2 上的 Agent 前缀 KV 回载争用和加载方法对照。">
+  <meta name="description" content="Agent 前缀 KV 回载的研究问题、方法局限与昇腾 910B2 实测对照。">
   <title>SuperLoad · Agent 前缀 KV 回载</title>
   <link rel="stylesheet" href="assets/style.css">
 </head>
@@ -13,6 +13,7 @@
     <div class="frame top-inner">
       <a class="wordmark" href="./"><span class="mark" aria-hidden="true"></span>SuperLoad</a>
       <nav aria-label="报告导航">
+        <a href="#overview">研究概览</a>
         <a href="#comparison">方法对照</a>
         <a href="#prefix-contention">问题验证</a>
       </nav>
@@ -21,6 +22,13 @@
   </header>
   <main id="main" class="frame body">
     <h1>Agent 前缀 KV 回载</h1>
+    <section id="overview" aria-labelledby="overview-title">
+      <h2 id="overview-title">研究概览</h2>
+      <div class="overview-chapters">@@OVERVIEW@@</div>
+      <div class="resources">
+        <a href="https://github.com/KimmoZAG/SuperLoad/blob/main/overview.md">阅读 overview.md</a>
+      </div>
+    </section>
     <section id="comparison" aria-labelledby="comparison-title">
       <h2 id="comparison-title">五种方法实测</h2>
       <div class="figure-stack">@@COMPARISON@@</div>

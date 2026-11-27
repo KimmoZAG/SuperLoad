@@ -26,10 +26,10 @@ jobs:
           python-version: '3.12'
           cache: pip
           cache-dependency-path: report/requirements.txt
-      - name: Check benchmark behavior
-        run: python3 -m unittest discover -s tests -v
-      - name: Install figure dependencies
+      - name: Install report dependencies
         run: python3 -m pip install -r report/requirements.txt
+      - name: Run tests
+        run: python3 -m unittest discover -s tests -v
       - name: Build report
         run: python3 report/build.py
       - name: Configure Pages

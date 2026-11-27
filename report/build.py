@@ -7,6 +7,7 @@ import shutil
 from pathlib import Path
 
 import comparison
+from overview import render_overview
 import prefix
 from release_data import ResultsRelease
 
@@ -95,7 +96,9 @@ def main():
         + '</article>'
         for gap in (25, 0)
     )
-    report = (template.replace("@@PREFIX_RESULTS@@", figure("tool-agent-prefix", "共现率与小回载就绪时延"))
+    overview = render_overview((ROOT / "overview.md").read_text(encoding="utf-8"))
+    report = (template.replace("@@OVERVIEW@@", overview)
+              .replace("@@PREFIX_RESULTS@@", figure("tool-agent-prefix", "共现率与小回载就绪时延"))
               .replace("@@COMPARISON@@", charts)
               .replace("@@PREFIX_DOWNLOAD@@", download_link(release, "问题验证原始 ZIP"))
               .replace("@@COMPARISON_DOWNLOAD@@", download_link(compare_release, "对照原始 ZIP")))

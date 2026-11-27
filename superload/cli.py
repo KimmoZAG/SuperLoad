@@ -61,6 +61,10 @@ def parser():
         command.add_argument("--output", required=True)
         if measure is compare_prefix:
             command.add_argument("--chunk-blocks", type=positive, default=2)
+            command.add_argument(
+                "--host-buffer", choices=("pageable", "paired"), default="pageable",
+                help="compare ordinary and CANN pinned host buffers in the same Buffered I/O run",
+            )
     return cli
 
 

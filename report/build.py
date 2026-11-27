@@ -118,7 +118,10 @@ def main():
             json.dumps(data, indent=2, ensure_ascii=False, allow_nan=False) + "\n", encoding="utf-8",
         )
     template = (STATIC / "index.html").read_text(encoding="utf-8")
-    charts = arrival_figures(figures, "method-comparison", "五种方法对照，延迟越低越好，吞吐越高越好")
+    description = "五种方法对照，延迟越低越好，吞吐越高越好"
+    if "buffered-pinned" in compare_summary["measurements"]:
+        description += "。包含 Buffered I/O 普通缓冲、Direct I/O 和 Buffered I/O 锁页缓冲。"
+    charts = arrival_figures(figures, "method-comparison", description)
     ablation_charts = arrival_figures(
         figures, "direct-io-ablation",
         "Direct I/O 下普通主机缓冲和 CANN 锁页路径的三种调度方法。"

@@ -11,6 +11,7 @@ from collections import Counter, deque
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import ExitStack
 from dataclasses import dataclass, field
+from itertools import product
 from pathlib import Path
 
 from ..dataset.corpus import generate, open_corpus, page_bytes, read_manifest
@@ -25,6 +26,7 @@ from .prefix import CORPUS_SEED, STAGGER_MS
 METHODS = ("fifo", "bidaw", "strata-io", "libra", "chunk-rr")
 GAPS_MS = (0, STAGGER_MS)
 LAYOUTS = ("layer-major", "page-first")
+HOST_BUFFERS = ("pageable", "pinned")
 
 
 @dataclass
@@ -113,6 +115,10 @@ def verify(jobs, device, expected):
 
 
 def measure(args, plan, payload):
+    paired = getattr(args, "host_buffer", "pageable") == "paired"
+    if paired and (args.io != "buffered" or args.device == "cpu"):
+        raise ValueError("paired host buffers require Buffered I/O and an Ascend device")
+    host_buffers = HOST_BUFFERS if paired else HOST_BUFFERS[:1]
     pairs = plan["pairs"]
     page_count = len(plan["file_page_hashes"])
     if not pairs or plan["workload"] != "tool-agent-comparison" or plan["page_bytes"] != GEOMETRY.page_bytes:
@@ -139,30 +145,45 @@ def measure(args, plan, payload):
     with ExitStack() as stack:
         device = stack.enter_context(CPU() if args.device == "cpu" else Ascend(int(args.device)))
         base = stack.enter_context(device.allocate(length))
-        stager = HostBuffer(length)
-        stack.callback(stager.close)
-        for i in range(0, length, os.sysconf("SC_PAGESIZE")):
-            stager.view[i] = 0
-        sources = {}
+        def allocate_stager(size, host_buffer):
+            if host_buffer == "pinned":
+                buffer = stack.enter_context(device.allocate_host(size))
+            else:
+                buffer = HostBuffer(size)
+                stack.callback(buffer.close)
+            for offset in range(0, size, os.sysconf("SC_PAGESIZE")):
+                buffer.view[offset] = 0
+            return buffer
+
+        files = {}
         for layout in LAYOUTS:
             fd = open_corpus(corpus, layout, GEOMETRY, args.io, page_count=page_count)
             stack.callback(os.close, fd)
-            sources[layout] = LocalSource(fd, stager, device, GEOMETRY, layout, page_count)
-        native = sources["layer-major"]
-        buffers = []
-        for _ in range(2):
-            buffer = HostBuffer(chunk_size)
-            stack.callback(buffer.close)
-            for i in range(0, chunk_size, os.sysconf("SC_PAGESIZE")):
-                buffer.view[i] = 0
-            buffers.append(LocalSource(native.fd, buffer, device, GEOMETRY, "layer-major", page_count))
+            files[layout] = fd
+        sources = {}
+        libra_buffers = {}
+        native_layout, strata_layout = LAYOUTS
+        for host_buffer in host_buffers:
+            stager = allocate_stager(length, host_buffer)
+            by_layout = {
+                layout: LocalSource(fd, stager, device, GEOMETRY, layout, page_count)
+                for layout, fd in files.items()
+            }
+            sources[host_buffer] = by_layout
+            libra_buffers[host_buffer] = [
+                LocalSource(files[native_layout], allocate_stager(chunk_size, host_buffer),
+                            device, GEOMETRY, native_layout, page_count)
+                for _ in range(2)
+            ]
         executor = stack.enter_context(ThreadPoolExecutor(max_workers=1))
-        libra = PipelinedSource(executor, buffers, args.chunk_blocks, GEOMETRY.page_bytes)
-        loaders = {"strata-io": sources["page-first"], "libra": libra}
-
         warm = pairs[selected[0]]["small"]
-        for source in (native, sources["page-first"], libra):
-            source.load(warm, base)
+        loaders = {}
+        for host_buffer, by_layout in sources.items():
+            libra = PipelinedSource(executor, libra_buffers[host_buffer], args.chunk_blocks, GEOMETRY.page_bytes)
+            loaders[host_buffer] = {"strata-io": by_layout[strata_layout], "libra": libra}
+            for source in (*by_layout.values(), libra):
+                source.load(warm, base)
+
         for trial in range(args.repeat):
             order = selected.copy()
             rng.shuffle(order)
@@ -170,21 +191,27 @@ def measure(args, plan, payload):
             for pair_id in order:
                 pair = pairs[pair_id]
                 if args.io == "buffered":
-                    for source in sources.values():
+                    for source in sources["pageable"].values():
                         source.read(pair["small"] + pair["large"])
-                conditions = [(gap, method) for gap in GAPS_MS for method in METHODS]
+                conditions = list(product(GAPS_MS, METHODS, host_buffers))
                 rng.shuffle(conditions)
                 expected = {}
-                for gap, method in conditions:
-                    row, jobs = execute(pair, gap, method, loaders.get(method, native), base, args.chunk_blocks)
+                for gap, method, host_buffer in conditions:
+                    native = sources[host_buffer][native_layout]
+                    loader = loaders[host_buffer].get(method, native)
+                    row, jobs = execute(pair, gap, method, loader, base, args.chunk_blocks)
                     verified = verify(jobs, device, expected) if trial == 0 or pair_id == order[0] else 0
+                    if paired:
+                        row["host_buffer"] = host_buffer
                     records.append({"pair": pair_id, "gap_ms": gap, "method": method,
                                     "verified_blocks": verified, **row})
             trials.append(records)
             print(f"{args.io}: completed trial {trial + 1}/{args.repeat}, {len(records)} controls",
                   file=sys.stderr, flush=True)
     return {
-        "schema": 1, "profile": "tool-agent-comparison", "plan_sha256": hashlib.sha256(payload).hexdigest(),
+        "schema": 2 if paired else 1, "profile": "tool-agent-comparison",
+        "plan_sha256": hashlib.sha256(payload).hexdigest(),
+        **({"host_buffers": list(host_buffers)} if paired else {}),
         "backend": "cpu" if args.device == "cpu" else "ascend", "io": args.io, "storage": args.storage_label,
         "run_seed": args.seed, "chunk_blocks": args.chunk_blocks, "pairs": selected, "trials": trials,
     }

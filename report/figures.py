@@ -43,13 +43,18 @@ RELOAD_METRICS = (
 
 
 def render_reload_panels(groups, methods, output, name, *, mobile, log_metrics=("small_p95", "large_p95")):
-    """Draw two groups with the same metric axes and trial markers."""
+    """Draw comparison groups against shared metric axes."""
+    rows, columns = len(groups), len(RELOAD_METRICS)
     if mobile:
-        fig, axes = plt.subplots(6, 1, figsize=(5.2, 15.5))
-        fig.subplots_adjust(left=0.29, right=0.96, top=0.96, bottom=0.085, hspace=1.05)
+        height = 15.5 + (rows - 2) * 7.4
+        fig, axes = plt.subplots(rows * columns, 1, figsize=(5.2, height))
+        fig.subplots_adjust(left=0.29, right=0.96,
+                            top=1 - 0.04 * 15.5 / height, bottom=0.085 * 15.5 / height, hspace=1.05)
     else:
-        fig, axes = plt.subplots(2, 3, figsize=(11.4, 5.75), sharex="col", sharey=True)
-        fig.subplots_adjust(left=0.135, right=0.982, top=0.90, bottom=0.19, hspace=0.42, wspace=0.29)
+        height = 5.75 + (rows - 2) * 2.4
+        fig, axes = plt.subplots(rows, columns, figsize=(11.4, height), sharex="col", sharey=True)
+        fig.subplots_adjust(left=0.135, right=0.965 if rows == 3 else 0.982,
+                            top=1 - 0.10 * 5.75 / height, bottom=0.19 * 5.75 / height, hspace=0.42, wspace=0.29)
     for col, (metric, label) in enumerate(RELOAD_METRICS):
         points = [v for group in groups.values() for method in methods
                   for v in group[method][metric]["trials"]]
@@ -61,9 +66,9 @@ def render_reload_panels(groups, methods, output, name, *, mobile, log_metrics=(
             axis_label = "Pair throughput (GiB/s)"
         direction = "← Lower is better" if latency else "Higher is better →"
         for i, (group_label, group) in enumerate(groups.items()):
-            index = 2 * col + i if mobile else 3 * i + col
+            index = rows * col + i if mobile else columns * i + col
             ax = axes.flat[index]
-            panel_title(ax, "ABCDEF"[index], f"{group_label} · {label}")
+            panel_title(ax, chr(ord("A") + index), f"{group_label} · {label}")
             if log_scale:
                 ax.set_xscale("log")
                 ax.set_xlim(min(points) * 0.8, max(points) * 1.2)
@@ -76,7 +81,7 @@ def render_reload_panels(groups, methods, output, name, *, mobile, log_metrics=(
                 ax.xaxis.set_major_locator(MaxNLocator(nbins=4))
             else:
                 ax.set_xlim(0, max(points) * 1.10)
-            ax.set_xlabel(f"{axis_label}\n{direction}" if i == 1 or mobile else direction)
+            ax.set_xlabel(f"{axis_label}\n{direction}" if i == rows - 1 or mobile else direction)
             ax.set_yticks(range(len(methods)), [name for name, _ in methods.values()])
             ax.set_ylim(len(methods) - 0.5, -0.5)
             ax.grid(axis="x")

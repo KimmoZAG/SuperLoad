@@ -3,6 +3,7 @@
 import ctypes as C
 import mmap
 from contextlib import contextmanager
+from types import SimpleNamespace
 
 
 class HostBuffer:
@@ -29,6 +30,8 @@ class Ascend:
         self.lib.aclrtResetDevice.argtypes = [C.c_int]
         self.lib.aclrtMalloc.argtypes = [C.POINTER(C.c_void_p), C.c_size_t, C.c_int]
         self.lib.aclrtFree.argtypes = [C.c_void_p]
+        self.lib.aclrtMallocHost.argtypes = [C.POINTER(C.c_void_p), C.c_size_t]
+        self.lib.aclrtFreeHost.argtypes = [C.c_void_p]
         self.lib.aclrtMemcpy.argtypes = [C.c_void_p, C.c_size_t, C.c_void_p, C.c_size_t, C.c_int]
         self.lib.aclGetRecentErrMsg.restype = C.c_char_p
 
@@ -61,6 +64,17 @@ class Ascend:
             yield ptr.value
         finally:
             self.call("aclrtFree", ptr)
+
+    @contextmanager
+    def allocate_host(self, size):
+        ptr = C.c_void_p()
+        self.call("aclrtMallocHost", C.byref(ptr), size)
+        try:
+            array = (C.c_ubyte * size).from_address(ptr.value)
+            with memoryview(array).cast("B") as view:
+                yield SimpleNamespace(address=ptr.value, view=view)
+        finally:
+            self.call("aclrtFreeHost", ptr)
 
     def upload(self, dest, source, size):
         self.call("aclrtMemcpy", dest, size, source, size, 1)

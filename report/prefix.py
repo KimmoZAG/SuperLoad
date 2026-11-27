@@ -185,8 +185,8 @@ def panel(summary, release_url, figure):
     link = f' · <a href="{html.escape(release_url)}">原始测量（Release）</a>' if release_url else ""
     return (
         figure("tool-agent-prefix", "Agent 前缀回载共现率与小回载就绪延迟",
-                 "A 为同窗共现比例，菱形是三种组内顺序的中位数，横线是范围。B、C 汇集各轮的小回载样本，"
-                 "共用对数时延轴。95% 参考线对应合并分布，表中 P95 为各轮 P95 的中位数。")
+                 "A 为大小回载的同窗共现率，B、C 为两种 I/O 模式下的小回载就绪延迟分布。",
+                 show_scroll_note=False)
         + '<div class="table-wrap" role="region" aria-label="Agent 前缀回载配对测量" tabindex="0">'
         f'<table><caption>各轮统计的中位数</caption><thead><tr>{headers}</tr></thead>'
         f'<tbody>{"".join(lines)}</tbody></table></div>'

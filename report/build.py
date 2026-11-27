@@ -118,13 +118,14 @@ def chip_table(matrix, mode, profile, schemes):
     )
 
 
-def figure(name, alt, caption):
+def figure(name, alt, caption, *, show_scroll_note=True):
+    scroll_note = '<span class="mobile-scroll-note">横向滑动可查看完整面板。</span>' if show_scroll_note else ""
     return (
         '<figure class="paper-figure">'
         f'<div class="figure-viewport" tabindex="0" role="region" aria-label="{html.escape(alt)}">'
         f'<img src="figures/{name}.svg" alt="{html.escape(alt)}" decoding="async"></div>'
         f'<figcaption><span>{html.escape(caption)}'
-        '<span class="mobile-scroll-note">横向滑动可查看完整面板。</span></span><span class="figure-downloads">'
+        f'{scroll_note}</span><span class="figure-downloads">'
         f'<a href="figures/{name}.svg" aria-label="{html.escape(alt)} SVG">SVG</a>'
         f'<a href="figures/{name}.pdf" aria-label="{html.escape(alt)} PDF">PDF</a>'
         '</span></figcaption></figure>'

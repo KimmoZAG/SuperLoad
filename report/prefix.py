@@ -98,8 +98,19 @@ def summarize(plan, measurements):
                     gib = sum(r["hbm_bytes"] for r in small + large) / (1 << 30)
                     metrics["pair_gib_s"].append(gib / (sum(r["elapsed_ms"] for r in observations) / 1000))
             cases[case] = {key: {"median": median(values), "trials": values} for key, values in metrics.items()}
+        samples = [r["cases"] for trial in run["trials"] for r in trial]
+        large_first = [sample["large-first"]["requests"]["large"] for sample in samples]
         summary["measurements"][mode] = {
-            "cases": cases, "repeat": len(run["trials"]), "pairs": len(run["pairs"]),
+            "cases": cases, "repeat": len(run["trials"]), "pairs": len(run["pairs"]), "samples": len(samples),
+            "small_delayed_by_large": sum(
+                sample["large-first"]["requests"]["small"]["ready_ms"]
+                > sample["small-only"]["requests"]["small"]["ready_ms"]
+                for sample in samples
+            ),
+            "large_first_stage_median_ms": {
+                "file_read": median(row["disk_ns"] for row in large_first) / 1e6,
+                "h2d": median(row["h2d_ns"] for row in large_first) / 1e6,
+            },
         }
     return summary
 
@@ -142,7 +153,7 @@ def render(summary, measurements, output):
         axis.axhline(0.95, color="#65747C", linestyle=":", linewidth=0.8)
         axis.set_xscale("log")
         axis.set_xlim(min(all_samples) * 0.8, max(all_samples) * 1.12)
-        axis.xaxis.set_major_locator(LogLocator(base=10, subs=(1, 2, 5)))
+        axis.xaxis.set_major_locator(LogLocator(base=10, subs=(1, 3)))
         axis.xaxis.set_major_formatter(ScalarFormatter())
         axis.xaxis.set_minor_formatter(NullFormatter())
         axis.set_ylim(0, 1.03)
@@ -161,6 +172,8 @@ def panel(summary, release_url, figure):
                    and s["order_seed"] == summary["primary_order_seed"])
     buffered = summary["measurements"]["buffered"]
     direct = summary["measurements"]["direct"]
+    stages = buffered["large_first_stage_median_ms"]
+    direct_stages = direct["large_first_stage_median_ms"]
 
     def small(case):
         return buffered["cases"][case]["small_ready_p95_ms"]["median"]
@@ -192,6 +205,12 @@ def panel(summary, release_url, figure):
         f'分别为 {small("small-only"):.2f}、{small("small-first"):.2f}、'
         f'{small("large-first"):.2f}、{small("large-first-25ms"):.2f} ms。'
         f'Direct I/O 复测抽取其中 {direct["pairs"]} 对，共 {direct["repeat"]} 轮。</p>'
+        f'<p class="blurb">Buffered 的大回载先执行时，'
+        f'{buffered["small_delayed_by_large"]} / {buffered["samples"]} 次小回载比单跑更慢。'
+        f'排在前面的大回载，其文件读取中位数为 {stages["file_read"]:.2f} ms，'
+        f'同步 H2D 调用中位数为 {stages["h2d"]:.2f} ms。Direct I/O 中这两段分别为 '
+        f'{direct_stages["file_read"]:.2f} 和 {direct_stages["h2d"]:.2f} ms。'
+        '两种 I/O 模式下，小回载都需等大回载完成，主要占用阶段随 I/O 模式变化。</p>'
         + figure("tool-agent-prefix", "Agent 前缀回载共现率与小回载就绪延迟",
                  "A 为同窗共现比例，菱形是三种组内顺序的中位数，横线是范围。B、C 汇集各轮的小回载样本，"
                  "共用对数时延轴。95% 参考线对应合并分布，表中 P95 为各轮 P95 的中位数。")

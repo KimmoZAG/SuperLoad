@@ -70,6 +70,18 @@ figcaption { display: flex; align-items: start; justify-content: space-between; 
 .figure-downloads { display: inline-flex; gap: .65rem; font-weight: 680; flex-shrink: 0; }
 .mobile-scroll-note { display: none; }
 .profile .paper-figure { margin-bottom: 1rem; }
+.mixed-charts { padding: clamp(.75rem, 2.1vw, 1.45rem); background: var(--surface); border: 1px solid var(--line); border-radius: .7rem; }
+.mixed-legend { display: flex; align-items: center; flex-wrap: wrap; gap: .35rem 1.2rem; padding: .2rem .2rem 1rem; color: var(--muted); font-size: .89rem; }
+.mixed-legend b { color: var(--ink); margin-right: .17rem; }
+.mixed-joint-label { color: #5441a4; font-weight: 700; }
+.mixed-metric + .mixed-metric { border-top: 1px solid var(--line); margin-top: .9rem; padding-top: 1rem; }
+.mixed-metric h3 { font-size: 1.23rem; padding-inline: .2rem; }
+.mixed-chart-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .65rem; }
+.mixed-chart { margin: 0; padding: .72rem .55rem .15rem; border: 1px solid var(--line); border-radius: .48rem; min-width: 0; }
+.mixed-chart h4 { display: flex; flex-wrap: wrap; align-items: baseline; gap: .12rem .6rem; margin: 0 .4rem .12rem; font-size: 1rem; }
+.mixed-chart h4 span { color: var(--muted); font-size: .78rem; font-weight: 500; }
+.mixed-chart img { display: block; width: 100%; height: auto; }
+.mixed-details > .profile { margin-top: .55rem; }
 .table-wrap { overflow-x: auto; }
 table { border-collapse: collapse; width: 100%; color: var(--ink); font-size: .94rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
 caption { text-align: left; color: var(--muted); margin-bottom: .4rem; font-size: .87rem; }
@@ -109,7 +121,7 @@ footer span { color: #bad7cd; font-weight: 450; }
   .frame { width: min(100% - 2rem, 70rem); }
   .hero-inner, .repro-grid { grid-template-columns: 1fr; }
   .section-top { align-items: start; flex-direction: column; gap: .55rem; }
-  .insights { grid-template-columns: 1fr; }
+  .insights, .mixed-chart-grid { grid-template-columns: 1fr; }
   .schematic { max-width: 24rem; }
 }
 @media (max-width: 33rem) {

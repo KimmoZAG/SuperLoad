@@ -18,6 +18,7 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 STATIC = HERE / "static"
 MIXED_RESULTS = HERE / "mixed-results.csv"
+JOINT_RESULTS = HERE / "results/joint-four-baselines/raw-results.tar.gz"
 NAMES = {
     "native": "原生加载", "roce": "RoCE RC", "strata": "Strata", "bidaw": "Bidaw",
     "solid": "SolidAttention", "native-lru": "原生 + LRU", "strata-io": "Strata 仅布局",
@@ -236,12 +237,16 @@ def main():
     prefix_summary = prefix.summarize(prefix_plan, prefix_runs)
     prefix.render(prefix_summary, prefix_runs, args.output / "figures")
     mixed_runs = mixed.load(MIXED_RESULTS)
-    render(matrix, args.output / "figures")
+    joint_runs = mixed.load_joint(JOINT_RESULTS)
+    figure_dir = args.output / "figures"
+    render(matrix, figure_dir)
+    mixed.render_joint(joint_runs, figure_dir)
     static = args.output / "assets"
     static.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(STATIC / "style.css", static / "style.css")
     shutil.copyfile(STATIC / "report.js", static / "report.js")
     shutil.copyfile(MIXED_RESULTS, static / "mixed-results.csv")
+    mixed.write_joint_csv(joint_runs, static / "joint-mixed-trials.csv")
     output = {"schema": 1, "runs": []}
     if release is not None:
         output["results_release"] = {"tag": release.tag, "url": release.page_url, "sha256": release.sha256}
@@ -271,6 +276,7 @@ def main():
     prefix_panel = prefix.panel(prefix_summary, prefix_release.page_url if prefix_release else "", figure)
     report = (template.replace("@@RESULTS@@", panels(matrix)).replace("@@INSIGHTS@@", insights(matrix))
               .replace("@@PREFIX_RESULTS@@", prefix_panel)
+              .replace("@@JOINT_RESULTS@@", mixed.joint_dashboard(joint_runs))
               .replace("@@MIXED_RESULTS@@", mixed.panels(mixed_runs))
               .replace("@@FIGURES@@", detail).replace("@@RESULTS_RELEASE@@", raw_link))
     (args.output / "index.html").write_text(report, encoding="utf-8")

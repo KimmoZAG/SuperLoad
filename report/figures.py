@@ -33,9 +33,10 @@ plt.rcParams.update({
 })
 
 
-def save(fig, output, name):
+def save(fig, output, name, *, pdf=True):
     fig.savefig(output / f"{name}.svg", metadata={"Date": None, "Title": name})
-    fig.savefig(output / f"{name}.pdf", metadata={"CreationDate": None, "Title": name})
+    if pdf:
+        fig.savefig(output / f"{name}.pdf", metadata={"CreationDate": None, "Title": name})
     plt.close(fig)
 
 
@@ -43,14 +44,15 @@ def panel_title(ax, letter, title):
     ax.set_title(f"({letter})  {title}", loc="left", pad=9)
 
 
-def metric_panel(ax, matrix, mode, profile, metric, axis_limits):
+def metric_panel(ax, matrix, mode, profile, metric, axis_limits, *, schemes=SCHEMES, digits=2):
+    latency = metric.endswith("p95_ms")
     labels = []
-    for i, (scheme, (label, color, _)) in enumerate(SCHEMES.items()):
+    for i, (scheme, (label, color, _)) in enumerate(schemes.items()):
         labels.append(label)
         cell = matrix[mode, profile, scheme]
         samples = [t["summary"][metric] for t in cell["trials"]]
         center = cell["summary"][metric]
-        if metric == "p95_ms":
+        if latency:
             ax.hlines(i, min(samples), max(samples), color=color, alpha=0.38, linewidth=2)
         else:
             ax.barh(i, center, color=color, alpha=0.16, height=0.58, linewidth=0)
@@ -58,12 +60,12 @@ def metric_panel(ax, matrix, mode, profile, metric, axis_limits):
             ax.scatter(value, i + (j - (len(samples) - 1) / 2) * 0.18,
                        facecolors="white", edgecolors=color, s=22, zorder=3)
         ax.scatter(center, i, marker="D", color=color, s=25, zorder=4)
-        ax.annotate(f"{center:.2f}", (max(samples), i), xytext=(5, 0), textcoords="offset points",
+        ax.annotate(f"{center:.{digits}f}", (max(samples), i), xytext=(5, 0), textcoords="offset points",
                     va="center", color=color, fontsize=9, fontweight="semibold")
     ax.set_yticks(range(len(labels)))
     ax.set_yticklabels(labels)
     ax.set_ylim(len(labels) - 0.45, -0.55)
-    if metric == "p95_ms":
+    if latency:
         ax.set_xscale("log")
         ax.xaxis.set_major_locator(LogLocator(base=10, subs=(1, 2, 5)))
         ax.xaxis.set_major_formatter(ScalarFormatter())

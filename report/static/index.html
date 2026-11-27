@@ -15,6 +15,7 @@
       <a class="wordmark" href="./"><span class="mark" aria-hidden="true"></span>SuperLoad</a>
       <nav aria-label="报告导航">
         <a href="#prefix-contention">配对实测</a>
+        <a href="#mixed-workloads">混合负载</a>
         <a href="#reproduce">复现</a>
         <a href="#mechanism-archive">机制实验</a>
       </nav>
@@ -48,6 +49,24 @@
         @@PREFIX_RESULTS@@
       </section>
 
+      <section id="mixed-workloads" aria-labelledby="mixed-workloads-title">
+        <div class="section-top">
+          <div>
+            <h2 id="mixed-workloads-title">混合负载实测</h2>
+            <p>联合切分与 LRU、Strata、Bidaw、SolidAttention 在同一台 910B2 上对比。每轮有 48 个前缀任务和 36 个稀疏任务，五个方案使用相同的到达时刻和页 ID。</p>
+          </div>
+          <a class="text-link" href="assets/joint-mixed-trials.csv" download>下载分轮 CSV</a>
+        </div>
+        @@JOINT_RESULTS@@
+        <p class="sample">联合切分按每个请求的缺页集合决定文件读取和 H2D 的切点，同批前缀共享页只读、只搬一次。</p>
+        <p class="sample">P95 从任务到达计到所需 KV 页全部进入 HBM，横轴使用对数刻度。逻辑吞吐按整轮统计。Buffered 预热 Linux 页缓存，Direct I/O 绕过读取端页缓存。<a href="https://github.com/KimmoZAG/SuperLoad/tree/main/report/results/joint-four-baselines">原始记录与复跑命令</a></p>
+        <details class="mixed-details">
+          <summary>查看早期四方案对照（0.28 GiB/s）</summary>
+          @@MIXED_RESULTS@@
+          <p class="sample"><a href="assets/mixed-results.csv" download>下载早期分轮 CSV</a></p>
+        </details>
+      </section>
+
       <section id="reproduce" aria-labelledby="reproduce-title">
         <div class="section-top"><div><h2 id="reproduce-title">复现实验</h2><p>使用公开 Mooncake 请求轨迹生成回载测量计划，在 Linux 和 Ascend CANN 环境下运行。</p></div></div>
         <div class="shell" aria-label="回放命令"><pre><code>curl -fLo toolagent_trace.jsonl https://raw.githubusercontent.com/kvcache-ai/Mooncake/main/FAST25-release/traces/toolagent_trace.jsonl
@@ -73,19 +92,6 @@ python3 -m superload prefix-bench --plan runs/prefix/plan.json --corpus data/pre
           <button type="button" data-target="sparse-decode" aria-pressed="false">稀疏解码</button>
         </div>
         @@RESULTS@@
-      </section>
-
-      <section id="mixed-workloads" aria-labelledby="mixed-workloads-title">
-        <div class="section-top">
-          <div>
-            <h2 id="mixed-workloads-title">混合负载实测</h2>
-            <p>前缀回载和稀疏历史页回载独立到达，共用单台主机上的文件读取、DRAM 中转和 H2D 通道。各方案使用相同的请求序列，名义逻辑输入为 0.28 GiB/s。</p>
-          </div>
-          <a class="text-link" href="assets/mixed-results.csv" download>下载分轮 CSV</a>
-        </div>
-        @@MIXED_RESULTS@@
-        <p class="sample">表中为三个种子各轮指标的中位数。前缀和稀疏分别统计从任务到达到全部 KV 页进入 910B2 HBM 的 P95。逻辑吞吐按整轮统计。Buffered 预热 Linux 页缓存，Direct I/O 绕过读取端页缓存。</p>
-        <p class="sample">LRU 使用 FIFO 和 24 页主机缓存。Strata、Bidaw 和 SolidAttention 使用 SuperLoad 的机制适配。<a href="https://github.com/KimmoZAG/SuperLoad/blob/main/docs/experiment.md#混合负载对照">混合负载测量方法</a></p>
       </section>
 
       <section id="distributions" aria-labelledby="distributions-title">

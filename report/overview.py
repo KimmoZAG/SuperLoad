@@ -66,5 +66,5 @@ def render_poster_results(summary):
         '<small>GiB/s</small></dd></div></dl>'
         '<p class="result-context">Direct I/O · 高回载量请求早到 25 ms · '
         f'{direct["pairs"]} 对 × {direct["repeat"]} 轮</p>'
-        '<a class="result-link" href="#comparison">查看实测图 <span aria-hidden="true">↓</span></a></section>'
+        '<a class="result-link" href="#recompute-crossover">查看实测图 <span aria-hidden="true">↓</span></a></section>'
     )

@@ -115,3 +115,20 @@ def summarize(plan, runs):
             },
         }
     return result
+
+
+def compare_with_controls(summary):
+    """Compare each metric with the strongest control under the same conditions."""
+    scores = []
+    for profile, measured in summary["measurements"].items():
+        for gap, methods in measured["gaps"].items():
+            for metric, best in (("small_p95", min), ("large_p95", min), ("gib_s", max)):
+                control, value = best(
+                    ((name, row[metric]["median"]) for name, row in methods.items() if name != "superload"),
+                    key=lambda item: item[1],
+                )
+                candidate = methods["superload"][metric]["median"]
+                scores.append({"profile": profile, "gap_ms": gap, "metric": metric, "control": control,
+                               "control_value": value, "superload": candidate,
+                               "wins": candidate != value and best(candidate, value) == candidate})
+    return scores

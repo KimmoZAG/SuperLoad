@@ -68,6 +68,7 @@ class RenderOverviewTest(unittest.TestCase):
 
         self.assertIn("KV reload.", overview)
         self.assertIn("<h3>Why existing works fail?（现有方法的局限性）</h3>", details)
+        self.assertIn('id="limitations"', details)
         self.assertIn('<div class="table-scroll overview-table"', details)
         self.assertIn("<th>重叠争用处理</th>", details)
         self.assertIn("<td><strong>跨请求让行</strong></td>", details)

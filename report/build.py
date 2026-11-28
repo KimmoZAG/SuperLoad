@@ -138,6 +138,7 @@ def main():
               .replace("@@LOW_RELOAD_RANGE@@", LOW_RELOAD_RANGE)
               .replace("@@HIGH_RELOAD_RANGE@@", HIGH_RELOAD_RANGE)
               .replace("@@COMPARISON@@", charts)
+              .replace("@@COMPARISON_FINDING@@", comparison.render_finding(compare_summary))
               .replace("@@EXPERIMENT_SIZE@@", experiment_size)
               .replace("@@COMPARISON_TABLES@@", comparison.render_tables(compare_summary))
               .replace("@@PREFIX_DOWNLOAD@@", download_link(release, "问题验证原始 ZIP"))

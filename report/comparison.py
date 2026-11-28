@@ -2,7 +2,7 @@
 
 import html
 
-from comparison_data import read, summarize
+from comparison_data import compare_with_controls, read, summarize
 from figures import RELOAD_METRICS, render_reload_panels
 
 
@@ -29,6 +29,17 @@ def render(summary, output):
                   for mode, label in GROUP_LABELS.items() if mode in measurements}
         for mobile in (False, True):
             render_reload_panels(groups, METHODS, output, f"method-comparison-{gap}ms", mobile=mobile)
+
+
+def render_finding(summary):
+    scores = compare_with_controls(summary)
+    wins = sum(score["wins"] for score in scores)
+    return (
+        '<div class="comparison-finding">'
+        f'<strong>{wins}/{len(scores)} 项</strong>'
+        '<p><b>优化后 SuperLoad 领先于同条件的最强对照</b>'
+        '<span>每种 I/O／缓冲配置和到达条件分别比较两组 HBM 就绪 P95 与双请求吞吐。</span></p></div>'
+    )
 
 
 def render_tables(summary):

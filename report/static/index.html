@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Agent 前缀 KV 回载的研究问题、方法局限与昇腾 910B2 实测对照。">
+  <meta name="description" content="SuperLoad 在昇腾 910B2 上协调 Agent 前缀 KV 的存储读取与 H2D，公开系统设计、六种方法的实测对照与复现过程。">
   <title>SuperLoad · Agent 前缀 KV 回载</title>
   <link rel="stylesheet" href="assets/style.css">
 </head>
@@ -14,6 +14,7 @@
       <a class="wordmark" href="./"><span class="mark" aria-hidden="true"></span>SuperLoad</a>
       <nav aria-label="报告导航">
         <a href="#overview">研究概览</a>
+        <a href="#system-design">系统设计</a>
         <a href="#comparison">方法对照</a>
         <a href="#prefix-contention">问题验证</a>
       </nav>
@@ -61,7 +62,9 @@
             <span class="low-volume-key">低回载量组 @@LOW_RELOAD_RANGE@@</span>
             <span class="high-volume-key">高回载量组 @@HIGH_RELOAD_RANGE@@</span>
           </div>
-          <p class="timeline-caption">回载量按单次从存储读取的 KV 字节数计。示意图从左到右表示执行顺序。</p>
+          <p class="timeline-caption">示意图从左到右表示执行顺序。回载量按单次从存储读取的 KV 字节数计。</p>
+          <p class="evidence-copy">SuperLoad 让已提交的传输继续执行，并在下一次可用的提交机会推进后到的低回载量请求。</p>
+          <a class="evidence-link" href="#system-design">查看跨阶段调度 <span aria-hidden="true">↓</span></a>
         </section>
         <section class="poster-motivation" aria-labelledby="poster-motivation-title">
           <h2 id="poster-motivation-title">回载何时比重算更快？</h2>
@@ -77,15 +80,59 @@
         </div>
       </details>
     </section>
-    <section id="recompute-crossover" aria-labelledby="recompute-crossover-title">
-      <h2 id="recompute-crossover-title">回载延迟与重算阈值</h2>
-      <p>左图比较同一批低回载量请求在两种调度下的 HBM 就绪延迟。右图统计在给定重算耗时下，有多少对请求会从「重算更快」变为「回载更快」。</p>
-      @@RECOMPUTE_CROSSOVER@@
+    <section id="system-design" aria-labelledby="system-design-title">
+      <h2 id="system-design-title">SuperLoad 如何协调两阶段回载</h2>
+      <p class="section-lead">同一调度器跟踪各请求的待回载 KV 页、目标 HBM 地址和搬运进度。每次提交存储读取或 H2D 拷贝时，由它选择下一块要搬运的 KV。</p>
+      <figure class="pipeline-diagram">
+        <div class="pipeline-scheduler">
+          <strong>跨请求调度器</strong>
+          <span>限制高回载量请求的在途传输块 · 优先提交已到达的低回载量请求</span>
+        </div>
+        <ol class="pipeline-stages" role="list" aria-label="KV 回载路径">
+          <li>
+            <h3>存储读取</h3>
+            <p>取得空闲主机缓冲后提交读取，按文件位置合并相邻 KV 页。</p>
+          </li>
+          <li>
+            <h3>主机 DRAM</h3>
+            <p>将已读入的 KV 和目标地址放入待 H2D 队列。此时可以继续读取其他块。</p>
+          </li>
+          <li>
+            <h3>写入 NPU HBM</h3>
+            <p>传输完成后更新请求进度。最后一块 KV 写入后，请求就绪。</p>
+          </li>
+        </ol>
+        <figcaption><span aria-hidden="true">↶</span> H2D 完成后归还主机缓冲，该缓冲才能用于下一次存储读取。</figcaption>
+      </figure>
+      <div class="resources">
+        <a href="https://github.com/KimmoZAG/SuperLoad/blob/main/superload/schemes/superload.py">查看流水线实现</a>
+        <a href="https://github.com/KimmoZAG/SuperLoad/blob/main/docs/reproduction.md#流水线行为测试">查看流水线行为测试</a>
+      </div>
     </section>
     <section id="comparison" aria-labelledby="comparison-title">
       <h2 id="comparison-title">六种方法实测</h2>
-      <p>六种方法在同一批 @@EXPERIMENT_SIZE@@ 上交错运行。图中的 SuperLoad (orig.) 为原 16 MiB 固定分块轮转，SuperLoad (opt.) 为优化后的流水线。</p>
-      <p>空心圆表示单轮，实心菱形表示各轮中位数。横轴为对数刻度，箭头标出改善方向。</p>
+      <p class="section-lead">在昇腾 910B2 上，将优化后 SuperLoad 与原生 FIFO、Bidaw、Strata I/O、Libra 和原 SuperLoad 交错运行，对照相同的请求对和到达条件。</p>
+      <div class="experiment-protocol">
+        <div>
+          <h3>请求对如何构建</h3>
+          <ol class="experiment-sampling" role="list">
+            <li><strong>Mooncake 公开轨迹</strong><span>从 Tool &amp; Agent 请求提取前缀复用关系。</span></li>
+            <li><strong>分层缓存回放</strong><span>筛出 HBM、DRAM 未命中且存储命中的 KV。</span></li>
+            <li><strong>@@EXPERIMENT_SIZE@@</strong><span>在同一时间窗内配对低、高回载量请求，且各自读取的 KV 页互不重叠。</span></li>
+          </ol>
+          <a href="https://github.com/KimmoZAG/SuperLoad/blob/main/docs/reproduction.md#从公开轨迹重建正式样本">查看正式样本的筛选与复现</a>
+        </div>
+        <div>
+          <h3>对照条件</h3>
+          <dl>
+            <div><dt>请求到达</dt><dd>同时到达<br>高回载量请求早到 25 ms</dd></div>
+            <div><dt>I/O 与缓冲</dt><dd>Buffered I/O 普通缓冲、CANN 锁页缓冲<br>Direct I/O 普通缓冲</dd></div>
+            <div><dt>评价指标</dt><dd>低、高回载量组的 HBM 就绪 P95<br>双请求吞吐</dd></div>
+          </dl>
+        </div>
+      </div>
+      @@COMPARISON_FINDING@@
+      <p class="comparison-guide">图中 SuperLoad (orig.) 为原 16 MiB 固定分块轮转，SuperLoad (opt.) 为优化后的流水线。空心圆表示单轮，实心菱形表示各轮中位数。横轴为对数刻度，箭头标出改善方向。</p>
       <div class="figure-stack">@@COMPARISON@@</div>
       <details class="comparison-tables">
         <summary>查看六种方法的逐项数值</summary>
@@ -97,6 +144,11 @@
         @@COMPARISON_DOWNLOAD@@
         <a href="https://github.com/KimmoZAG/SuperLoad/blob/main/docs/comparison.md">对照设置与结果解读</a>
       </div>
+    </section>
+    <section id="recompute-crossover" aria-labelledby="recompute-crossover-title">
+      <h2 id="recompute-crossover-title">回载延迟与重算阈值</h2>
+      <p>左图比较同一批低回载量请求在两种调度下的 HBM 就绪延迟。右图统计在给定重算耗时下，有多少对请求会从「重算更快」变为「回载更快」。</p>
+      @@RECOMPUTE_CROSSOVER@@
     </section>
     <section id="prefix-contention" aria-labelledby="prefix-title">
       <h2 id="prefix-title">队首阻塞与负载依据</h2>

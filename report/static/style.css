@@ -136,8 +136,14 @@ h3 { font-size: 1.15rem; margin-bottom: .5rem; }
   text-underline-offset: .2em;
 }
 
-.poster-evidence { margin-top: clamp(.75rem, 2.1vw, 1.45rem); }
+.poster-evidence {
+  grid-auto-rows: 1fr;
+  align-items: stretch;
+  margin-top: clamp(.75rem, 2.1vw, 1.45rem);
+}
 .poster-flow, .poster-motivation {
+  display: flex;
+  flex-direction: column;
   border: 1px solid var(--poster-border);
   padding: clamp(.9rem, 2.25vw, 1.4rem);
 }
@@ -192,6 +198,22 @@ h3 { font-size: 1.15rem; margin-bottom: .5rem; }
 .timeline-key span { display: inline-flex; align-items: center; gap: .32rem; }
 .timeline-key span::before { content: ""; width: .68rem; height: .68rem; border-radius: .14rem; }
 .timeline-caption { margin: .35rem 0 0; color: var(--muted); font-size: .76rem; }
+.evidence-copy {
+  margin: .72rem 0 0;
+  padding-top: .6rem;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: .85rem;
+}
+.evidence-link {
+  align-self: flex-start;
+  margin-top: auto;
+  padding-top: .6rem;
+  color: var(--link);
+  font-size: .8rem;
+  font-weight: 650;
+  text-underline-offset: .17em;
+}
 .poster-motivation {
   --crossover-ink: #4c3479;
   --crossover-border: #ddd4ee;
@@ -264,14 +286,7 @@ h3 { font-size: 1.15rem; margin-bottom: .5rem; }
 .crossover-axis span:last-child { transform: translateX(-100%); }
 .crossover-units { padding-top: .14rem; color: var(--muted); font-size: .7rem; }
 .crossover-preview figcaption { justify-content: flex-start; padding: .22rem 0 0; color: var(--muted); font-size: .71rem; }
-.poster-motivation > a {
-  display: inline-block;
-  margin-top: .42rem;
-  color: var(--crossover-ink);
-  font-size: .8rem;
-  font-weight: 650;
-  text-underline-offset: .17em;
-}
+.poster-motivation .evidence-link { color: var(--crossover-ink); }
 
 .poster-details { margin-top: 1.1rem; }
 .poster-details summary { cursor: pointer; width: fit-content; color: var(--link); font-size: .87rem; font-weight: 660; }
@@ -294,6 +309,113 @@ h3 { font-size: 1.15rem; margin-bottom: .5rem; }
 .overview-chapter img { display: block; width: 100%; max-width: 42rem; height: auto; margin-inline: auto; }
 .overview-chapter p > em:only-child { color: var(--muted); font-size: .875rem; }
 
+.section-lead { max-width: 72ch; margin: 0 0 1rem; color: var(--muted); }
+.pipeline-diagram {
+  margin: 0;
+  padding: clamp(.8rem, 2.3vw, 1.35rem);
+  border: 1px solid var(--line);
+  border-radius: .85rem;
+  background: var(--surface);
+}
+.pipeline-scheduler {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: .3rem 1.15rem;
+  padding: .72rem .85rem;
+  border-radius: .48rem;
+  background: var(--dark);
+  color: #f4faf8;
+}
+.pipeline-scheduler span { color: #bfe6d6; font-size: .86rem; }
+.pipeline-stages {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.85rem;
+  margin: .75rem 0;
+  padding: 0;
+  list-style: none;
+}
+.pipeline-stages li {
+  position: relative;
+  padding: .78rem .85rem;
+  border: 1px solid var(--line);
+  border-radius: .48rem;
+  background: var(--paper);
+}
+.pipeline-stages li + li::before {
+  content: "→" / "";
+  position: absolute;
+  left: -1.48rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--link);
+  font-weight: 700;
+}
+.pipeline-stages h3 { margin-bottom: .36rem; font-size: 1rem; }
+.pipeline-stages p { margin: 0; color: var(--muted); font-size: .88rem; }
+.pipeline-diagram figcaption {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: .45rem;
+  padding: .32rem .1rem 0;
+  border-top: 1px dashed var(--line);
+  color: var(--link);
+}
+.pipeline-diagram figcaption span { font-weight: 700; }
+
+.experiment-protocol {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(.75rem, 2.5vw, 1.5rem);
+  padding: clamp(.85rem, 2.4vw, 1.35rem);
+  border: 1px solid var(--line);
+  border-radius: .85rem;
+  background: var(--surface);
+}
+.experiment-protocol h3 { margin-bottom: .65rem; font-size: 1.04rem; }
+.experiment-sampling {
+  display: grid;
+  gap: .57rem;
+  margin: 0 0 .55rem;
+  padding: 0 0 0 .78rem;
+  border-inline-start: 2px solid #a6d0be;
+  list-style: none;
+}
+.experiment-sampling span { display: block; color: var(--muted); font-size: .86rem; }
+.experiment-protocol a { color: var(--link); font-size: .86rem; text-underline-offset: .17em; }
+.experiment-protocol dl { margin: 0; font-size: .86rem; }
+.experiment-protocol dl div {
+  display: grid;
+  grid-template-columns: 5rem minmax(0, 1fr);
+  gap: .45rem;
+  padding-block: .43rem;
+  border-top: 1px solid var(--line);
+}
+.experiment-protocol dt { color: var(--muted); }
+.experiment-protocol dd { margin: 0; }
+.comparison-finding {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .4rem 1rem;
+  margin: .75rem 0;
+  padding: .85rem 1rem;
+  border: 1px solid #bdd9cb;
+  border-radius: .65rem;
+  background: #eaf4ee;
+}
+.comparison-finding > strong {
+  color: var(--link);
+  font-size: clamp(1.65rem, 3.4vw, 2.3rem);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.comparison-finding p { margin: 0; }
+.comparison-finding p span { display: block; color: var(--muted); font-size: .86rem; }
+.comparison-guide { color: var(--muted); font-size: .86rem; }
+
 .paper-figure { background: var(--surface); border: 1px solid var(--line); border-radius: .68rem; margin: 0; min-width: 0; }
 .paper-figure { padding: clamp(.25rem, 1.05vw, .85rem); }
 .paper-figure picture, .paper-figure img { display: block; width: 100%; height: auto; }
@@ -307,6 +429,14 @@ h3 { font-size: 1.15rem; margin-bottom: .5rem; }
   .top-inner { flex-wrap: wrap; padding-block: .55rem; gap: .42rem .8rem; }
   .top nav { order: 1; width: 100%; font-size: .88rem; }
   .crossover-finding { flex-direction: column; align-items: flex-start; }
+  .pipeline-stages, .experiment-protocol { grid-template-columns: minmax(0, 1fr); }
+  .pipeline-stages { gap: 1.35rem; }
+  .pipeline-stages li + li::before {
+    content: "↓" / "";
+    left: 1rem;
+    top: -1.4rem;
+    transform: none;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }

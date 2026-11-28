@@ -63,7 +63,8 @@ def render_card(pairs):
         '<div class="crossover-units" aria-hidden="true">耗时（秒，对数）</div>'
         f'<div class="crossover-axis" aria-hidden="true">{ticks}</div>'
         '</div><figcaption>逐对 HBM 就绪延迟的中位数范围</figcaption></figure>'
-        '<a href="#recompute-crossover">查看配对分布与论文参考 <span aria-hidden="true">↓</span></a>'
+        '<a class="evidence-link" href="#recompute-crossover">查看配对分布与论文参考 '
+        '<span aria-hidden="true">↓</span></a>'
     )
 
 

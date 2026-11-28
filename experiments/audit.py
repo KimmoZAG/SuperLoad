@@ -6,7 +6,7 @@ import random
 import re
 from itertools import product
 
-from report.comparison_data import GAPS_MS, METHODS, PROFILES, read, summarize
+from report.comparison_data import GAPS_MS, METHODS, PROFILES, compare_with_controls, read, summarize
 
 
 SOURCE_FILES = {
@@ -107,18 +107,7 @@ def audit_results(directory, source):
     with (directory / "verification.json").open(encoding="utf-8") as stream:
         verification = check_verification(json.load(stream), plan, plan_digest, runs["direct"]["pairs"])
     summary = summarize(plan, runs)
-    scores = []
-    for profile, measured in summary["measurements"].items():
-        for gap, methods in measured["gaps"].items():
-            for metric, best in (("small_p95", min), ("large_p95", min), ("gib_s", max)):
-                control, value = best(
-                    ((name, row[metric]["median"]) for name, row in methods.items() if name != "superload"),
-                    key=lambda item: item[1],
-                )
-                candidate = methods["superload"][metric]["median"]
-                scores.append({"profile": profile, "gap_ms": gap, "metric": metric, "control": control,
-                               "control_value": value, "superload": candidate,
-                               "wins": candidate != value and best(candidate, value) == candidate})
+    scores = compare_with_controls(summary)
     return {
         "plan_sha256": plan_digest,
         "implementation_sha256": checksums,

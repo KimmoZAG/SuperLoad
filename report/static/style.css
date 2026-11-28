@@ -193,8 +193,6 @@ h3 { font-size: 1.15rem; margin-bottom: .5rem; }
 .timeline-key span::before { content: ""; width: .68rem; height: .68rem; border-radius: .14rem; }
 .timeline-caption { margin: .35rem 0 0; color: var(--muted); font-size: .76rem; }
 .poster-motivation { background: #f4f1fb; border-color: #e1d8f3; }
-.motivation-value { display: block; font-size: clamp(2rem, 4.5vw, 2.9rem); color: #553c88; line-height: 1; }
-.motivation-value span { font-size: .58em; }
 .poster-motivation p { margin: .42rem 0; color: #4d4264; font-size: .88rem; }
 .poster-motivation a { color: #573a85; font-size: .8rem; text-underline-offset: .17em; }
 

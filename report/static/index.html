@@ -64,10 +64,9 @@
           <p class="timeline-caption">回载量按单次从存储读取的 KV 字节数计。示意图从左到右表示执行顺序。</p>
         </section>
         <section class="poster-motivation" aria-labelledby="poster-motivation-title">
-          <h2 id="poster-motivation-title">排队影响首 token</h2>
-          <strong class="motivation-value">41<span>%</span></strong>
-          <p>Claude Code 生产轨迹回放中，Mooncake 高负载下的首 token 延迟由排队占去的比例。</p>
-          <a href="https://arxiv.org/html/2610.38355v2">FlatCake · 图 3</a>
+          <h2 id="poster-motivation-title">回载何时比重算更快？</h2>
+          <p>回载排队可能抵消复用前缀 KV 的延迟收益。用 ThunderServe 报告的 @@RECOMPUTE_REFERENCE_MS@@ ms prefill 作为参考，比较两种调度的实测回载耗时。</p>
+          <a href="#recompute-crossover">查看回载与重算的临界区间 ↓</a>
         </section>
       </div>
 
@@ -96,6 +95,15 @@
           <a href="https://github.com/KimmoZAG/SuperLoad/blob/main/overview.md">阅读 overview.md</a>
         </div>
       </details>
+    </section>
+    <section id="recompute-crossover" aria-labelledby="recompute-crossover-title">
+      <h2 id="recompute-crossover-title">问题重要性 · 回载与重算</h2>
+      <p>左图显示同一批低回载量请求在原生 FIFO 和 SuperLoad 下的 HBM 就绪延迟。右图给定重算参考耗时 <var>C</var>，统计多少配对满足「SuperLoad 回载 &lt; 重算 &lt; 原生 FIFO 回载」。</p>
+      @@RECOMPUTE_CROSSOVER@@
+      <div class="resources">
+        <a href="https://proceedings.mlsys.org/paper_files/paper/2025/file/c2a0e26dd9ee7d57e92bb1c24b39659a-Paper-Conference.pdf">重算参考来源 · ThunderServe，附录 H 表 5</a>
+      </div>
+      <p>竖线标出论文报告的 @@RECOMPUTE_REFERENCE_MS@@ ms prefill 耗时。测量使用 LLaMA-30B、4 张 A40 和 1,024-token 输入。昇腾 910B2 数据来自存储到 HBM 的回载实验，右图将论文值作为外部参考代入。</p>
     </section>
     <section id="comparison" aria-labelledby="comparison-title">
       <h2 id="comparison-title">五种方法实测</h2>

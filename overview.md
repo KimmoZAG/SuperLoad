@@ -12,15 +12,11 @@ Agent 会话间歇推进，不同任务积累的可复用上下文规模各异�
 
 ## Why it matters?（问题重要性）
 
-**真实后果。** 在线 Agent 请求可能因为等待 KV 回载而延迟生成首个 token。FlatCake 回放 Claude Code 的生产请求时发现，随着负载上升，Mooncake 的排队时间从 0.2 秒增至 5 秒，占高负载下首 token 延迟的 41%。
+**回载的延迟收益。** 命中存储层可以复用已有前缀 KV。回载还需要等待共享通路，当回载总耗时超过直接重算时，这次缓存命中就失去了延迟优势。
 
-![FlatCake 图 3。Claude Code 生产轨迹回放中，Mooncake、Tutti 和 FlatCake 在低、中、高负载下的首 token 延迟分解。](https://arxiv.org/html/2610.38355v2/fig_ttft_breakdown.svg)
+**配对证据。** 我们使用 Mooncake Tool & Agent 线上请求轨迹，通过分层缓存回放筛选存储回载请求。在昇腾 910B2 的 Direct I/O 实验中，高回载量请求早到 25 ms。对每对请求取两轮中位数，分别统计原生 FIFO 和 SuperLoad 下低回载量组的 HBM 就绪延迟。[数据与测量方法](docs/comparison.md) · [回载延迟与重算阈值](https://kimmozag.github.io/SuperLoad/#recompute-crossover)
 
-*图源：Huang 等，A Flat KV Cache Storage Architecture for LLM Serving，arXiv:2610.38355v2，图 3。*
-
-**研究价值。** 把 KV 缓存扩展到存储可以保留更多可复用前缀。量化回载争用造成的等待，可以为兼顾缓存容量和响应时间的分层缓存设计提供依据。
-
-**潜在收益。** 如果能减少并发回载带来的等待，在线 Agent 在高负载下就有望更稳定地给出首个 token，让更多请求在同样的硬件预算内满足延迟目标。
+**重算参考。** ThunderServe 论文报告，LLaMA-30B 在 4 张 A40 上处理 1,024-token 输入时，非分离式基线的 prefill 耗时为 884 ms。以该论文值代入当前的配对延迟，20 对均满足「SuperLoad 回载 < 重算参考 < 原生 FIFO 回载」。这个结果描述给定参考值下的交叉条件。实际重算耗时随模型、输入和设备而变。[ThunderServe，MLSys 2025，附录 H 表 5](https://proceedings.mlsys.org/paper_files/paper/2025/file/c2a0e26dd9ee7d57e92bb1c24b39659a-Paper-Conference.pdf)
 
 ## Why existing works fail?（现有方法的局限性）
 

@@ -12,6 +12,7 @@ import direct_ablation
 from figures import HIGH_RELOAD_RANGE, LOW_RELOAD_RANGE
 from overview import render_overview, render_poster_results
 import prefix
+import recompute
 from release_data import ResultsRelease
 
 
@@ -106,6 +107,9 @@ def main():
     prefix.render(summary, runs, figures)
     comparison.render(compare_summary, figures)
     direct_ablation.render(ablation_summary, figures)
+    direct = compare_runs["direct"]
+    recompute_pairs = recompute.paired_latencies(direct)
+    recompute.render(recompute_pairs, len(direct["trials"]), figures)
 
     assets = args.output / "assets"
     assets.mkdir(parents=True, exist_ok=True)
@@ -123,9 +127,12 @@ def main():
         description += "。包含 Buffered I/O 普通缓冲、Direct I/O 和 Buffered I/O 锁页缓冲。"
     charts = arrival_figures(figures, "method-comparison", description)
     prefix_chart = figure(figures, "tool-agent-prefix", "两组请求的共现率与低回载量组就绪延迟")
+    recompute_chart = figure(figures, "recompute-crossover", "低回载量组的回载延迟实测分布与重算参考时间下的配对比例")
     overview = render_overview((ROOT / "overview.md").read_text(encoding="utf-8"))
     report = (template.replace("@@POSTER_RESULTS@@", render_poster_results(compare_summary))
               .replace("@@OVERVIEW@@", overview)
+              .replace("@@RECOMPUTE_CROSSOVER@@", recompute_chart)
+              .replace("@@RECOMPUTE_REFERENCE_MS@@", str(recompute.REFERENCE_MS))
               .replace("@@PREFIX_RESULTS@@", prefix_chart)
               .replace("@@LOW_RELOAD_RANGE@@", LOW_RELOAD_RANGE)
               .replace("@@HIGH_RELOAD_RANGE@@", HIGH_RELOAD_RANGE)

@@ -12,6 +12,7 @@ SuperLoad 的当前实验包括 Agent 前缀回载的队首阻塞验证，同一
 | 测量与 HBM 校验 | [superload/benchmark/prefix.py](../superload/benchmark/prefix.py)、[superload/benchmark/comparison.py](../superload/benchmark/comparison.py)、[superload/hardware/device.py](../superload/hardware/device.py) |
 | 运行论文机制对照 | [superload/schemes/bidaw.py](../superload/schemes/bidaw.py)、[superload/schemes/libra.py](../superload/schemes/libra.py)。Strata I/O 布局在 `dataset/corpus.py`，固定分块轮转在 `benchmark/comparison.py`。 |
 | Direct I/O 分块与锁页补测 | [实验说明与复现](direct-io-ablation.md)、[汇总代码](../report/direct_ablation.py) |
+| 绘制回载与重算的临界区间 | [report/recompute.py](../report/recompute.py)、[问题重要性](../overview.md#why-it-matters问题重要性) |
 | 选择发布批次 | [report/prefix-results-release.json](../report/prefix-results-release.json)、[report/comparison-results-release.json](../report/comparison-results-release.json)、[report/direct-ablation-results-release.json](../report/direct-ablation-results-release.json) |
 | 生成图表和网页 | [report/prefix.py](../report/prefix.py)、[report/comparison.py](../report/comparison.py)、[report/overview.py](../report/overview.py)、[report/build.py](../report/build.py)、[report/static/index.html](../report/static/index.html)、[report/static/style.css](../report/static/style.css) |
 | 测试与发布 | [tests/](../tests/)、[.github/workflows/pages.yml](../.github/workflows/pages.yml) |

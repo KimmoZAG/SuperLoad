@@ -9,7 +9,7 @@ from pathlib import Path
 
 import comparison
 from figures import HIGH_RELOAD_RANGE, LOW_RELOAD_RANGE
-from overview import render_overview, render_poster_results
+from overview import render_overview_parts, render_poster_results
 import prefix
 import recompute
 from release_data import ResultsRelease
@@ -129,9 +129,10 @@ def main():
             'c2a0e26dd9ee7d57e92bb1c24b39659a-Paper-Conference.pdf">ThunderServe · 表 5</a></span>'
         ),
     )
-    overview = render_overview((ROOT / "overview.md").read_text(encoding="utf-8"))
+    overview, limitations = render_overview_parts((ROOT / "overview.md").read_text(encoding="utf-8"))
     report = (template.replace("@@POSTER_RESULTS@@", render_poster_results(compare_summary))
               .replace("@@OVERVIEW@@", overview)
+              .replace("@@LIMITATIONS@@", limitations)
               .replace("@@RECOMPUTE_CROSSOVER@@", recompute_chart)
               .replace("@@PREFIX_RESULTS@@", prefix_chart)
               .replace("@@LOW_RELOAD_RANGE@@", LOW_RELOAD_RANGE)

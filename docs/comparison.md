@@ -19,7 +19,7 @@
 | 原 SuperLoad | 每次同步加载 16 MiB，在块边界重新接纳和轮转请求。 |
 | 优化后 SuperLoad | 使用 page-first 布局、低回载量优先、有界读队列和独立 H2D 阶段。 |
 
-三个论文方法均按本机回载路径移植所列机制。比较范围覆盖文件 I/O、主机缓冲、调度和 H2D。
+三个论文方法均按本机回载路径移植所列机制。比较范围覆盖文件 I/O、主机缓冲、调度和 H2D。各方法的请求范围、通路范围和争用处理见 [现有方法的局限性](https://kimmozag.github.io/SuperLoad/#limitations)。
 
 ## 优化后 SuperLoad 的配置
 

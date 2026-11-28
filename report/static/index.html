@@ -70,22 +70,9 @@
         </section>
       </div>
 
-      <section class="poster-mechanisms" aria-labelledby="poster-mechanisms-title">
-        <h2 id="poster-mechanisms-title">方法在哪个阶段起作用</h2>
-        <div class="mechanism-grid">
-          <article>
-            <h3>发出前 · 请求排序</h3>
-            <p><strong>Bidaw</strong> 按回载量和等待时间重排待发请求，排序在提交回载前发生。</p>
-          </article>
-          <article>
-            <h3>执行中 · 搬运提速</h3>
-            <p><strong>Strata I/O</strong> 合并相邻读。<strong>Libra 流水</strong> 重叠文件读取与 H2D。两者优化本次回载的搬运时间。</p>
-          </article>
-          <article>
-            <h3>跨阶段 · 回载流水线</h3>
-            <p><strong>SuperLoad</strong> 结合页布局、有界分块与独立 H2D，优先推进已到达的低回载量请求。</p>
-          </article>
-        </div>
+      <section id="limitations" class="poster-limitations" aria-labelledby="limitations-title">
+        <h2 id="limitations-title">现有方法的局限性</h2>
+        @@LIMITATIONS@@
       </section>
 
       <details class="poster-details">

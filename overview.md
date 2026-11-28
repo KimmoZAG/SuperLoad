@@ -20,14 +20,16 @@ Agent 会话间歇推进，不同任务积累的可复用上下文规模各异�
 
 ## Why existing works fail?（现有方法的局限性）
 
-高回载量请求先占用共享 KV 回载通道时，后到的低回载量请求可能长时间排队。下列论文方法的比较范围是本机回载机制。
+| 方法 | 优化对象 | 请求范围 | 通路范围 | 重叠争用处理 |
+| --- | --- | --- | --- | --- |
+| Bidaw | 请求顺序 | 待发请求间 | 调度队列 | 有限 |
+| Strata I/O | 数据布局 | 单个请求 | 存储读取 | 间接缓解 |
+| Libra | 搬运流水 | 单个请求 | 读取与 H2D | 间接缓解 |
+| **SuperLoad** | **通路资源分配** | **在途与后到请求** | **读取与 H2D** | **跨请求让行** |
 
-- **原生 FIFO** 按到达顺序逐个完成回载。排在后面的低回载量请求必须等到先到的请求完成，形成队首阻塞。
-- **Bidaw** 按等待时间和回载量对待发请求排序。两组请求同时在队列中时可以重排，后到请求要等当前回载完成才有机会获得通道。[Bidaw §3.2](https://www.usenix.org/system/files/fast26-hu-shipeng.pdf)
-- **Strata I/O** 将同一页的各层 KV 连续存放，用更大的连续传输缩短回载时间。布局优化压缩了高回载量请求占用通道的时间，低回载量请求何时获得通道仍由原有调度决定。[Strata §4.2.1](https://www.usenix.org/system/files/osdi26-xie-zhiqiang.pdf)
-- **Libra 流水** 通过分块重叠传输与计算来提高资源利用率。请求级 FIFO 的本机流水实现仍会让后到的低回载量请求等待当前回载完成。[Libra §4.2–4.3](https://www.usenix.org/system/files/nsdi26-ruan-libra.pdf)
+在本机回载实现中，Bidaw 能在多个待发请求之间分配服务顺序，这个决定在请求进入搬运通路前作出。Strata I/O 和 Libra 则改善已经开始的搬运。尤其是 Libra，已经能协调读取和 H2D 两个阶段，但流水中的资源仍服务于同一个请求。 [Bidaw §3.2](https://www.usenix.org/system/files/fast26-hu-shipeng.pdf) · [Strata §4.2.1](https://www.usenix.org/system/files/osdi26-xie-zhiqiang.pdf) · [Libra §4.2–4.3](https://www.usenix.org/system/files/nsdi26-ruan-libra.pdf)
 
-要保护低回载量请求的尾延迟，共享通道需要在高回载量请求完成前有机会重新选择服务对象。
+当高回载量请求已经占用通路、低回载量请求随后到达时，**两个问题同时出现：该让哪个请求继续，以及该把通路上的哪部分资源交给它。** SuperLoad 把这两个决策放在一起。这样，后到请求可以在高回载量请求完成前推进，而高回载量请求仍能沿流水线继续搬运。
 
 ## What is your key idea?（核心思想）
 

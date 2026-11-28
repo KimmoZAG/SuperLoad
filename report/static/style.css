@@ -142,7 +142,7 @@ h3 { font-size: 1.15rem; margin-bottom: .5rem; }
   padding: clamp(.9rem, 2.25vw, 1.4rem);
 }
 .poster-flow { background: var(--surface); }
-.poster-flow h2, .poster-motivation h2, .poster-mechanisms h2 { font-size: clamp(1.05rem, 2.3vw, 1.4rem); margin-bottom: .75rem; }
+.poster-flow h2, .poster-motivation h2, .poster-limitations h2 { font-size: clamp(1.05rem, 2.3vw, 1.4rem); margin-bottom: .75rem; }
 .timeline {
   --lane-start: 6.75rem;
   position: relative;
@@ -196,16 +196,16 @@ h3 { font-size: 1.15rem; margin-bottom: .5rem; }
 .poster-motivation p { margin: .42rem 0; color: #4d4264; font-size: .88rem; }
 .poster-motivation a { color: #573a85; font-size: .8rem; text-underline-offset: .17em; }
 
-.poster-mechanisms { margin-top: clamp(1rem, 2.75vw, 1.7rem); }
-.mechanism-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 1rem;
+.poster-limitations {
+  margin-top: clamp(1rem, 2.75vw, 1.7rem);
+  padding: clamp(.9rem, 2.25vw, 1.4rem);
+  border: 1px solid var(--poster-border);
+  border-radius: .85rem;
+  background: var(--surface);
 }
-.mechanism-grid article { padding: .6rem 0 0 .8rem; border-left: 2px solid #9abbb1; }
-.mechanism-grid article:last-child { border-color: var(--signal); }
-.mechanism-grid h3 { font-size: .9rem; margin: 0 0 .27rem; }
-.mechanism-grid p { margin: 0; font-size: .83rem; color: var(--muted); }
+.poster-limitations p { margin: .7rem 0; }
+.poster-limitations > :last-child { margin-bottom: 0; }
+.poster-limitations a { color: var(--link); text-underline-offset: .17em; }
 .poster-details { margin-top: 1.1rem; }
 .poster-details summary { cursor: pointer; width: fit-content; color: var(--link); font-size: .87rem; font-weight: 660; }
 .poster-details .overview-chapters { margin-top: .65rem; }
@@ -234,8 +234,7 @@ h3 { font-size: 1.15rem; margin-bottom: .5rem; }
 .figure-stack { display: grid; grid-template-columns: minmax(0, 1fr); gap: .8rem; }
 @media (max-width: 48rem) {
   .frame { width: min(100% - 2rem, 70rem); }
-  .poster-opening, .poster-evidence, .mechanism-grid { grid-template-columns: minmax(0, 1fr); }
-  .mechanism-grid { gap: .75rem; }
+  .poster-opening, .poster-evidence { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 35rem) {
   .top-inner { flex-wrap: wrap; padding-block: .55rem; gap: .42rem .8rem; }
@@ -260,3 +259,6 @@ figcaption { justify-content: flex-end; padding: .12rem .35rem; }
 }
 .table-scroll th[scope="row"], .table-scroll th:first-child, .table-scroll td:first-child { text-align: left; }
 .table-scroll strong { color: var(--link); }
+.limitations-table table { min-width: 28rem; }
+.limitations-table th, .limitations-table td { text-align: left; white-space: normal; }
+.limitations-table thead { background: var(--paper); }

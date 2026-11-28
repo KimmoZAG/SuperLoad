@@ -1,7 +1,7 @@
 import unittest
 from textwrap import dedent
 
-from report.overview import render_overview, render_poster_results
+from report.overview import render_overview, render_overview_parts, render_poster_results
 
 
 class RenderOverviewTest(unittest.TestCase):
@@ -42,6 +42,30 @@ class RenderOverviewTest(unittest.TestCase):
         self.assertIn('href="https://example.org/paper"', content)
         self.assertIn('src="https://example.org/chart.svg"', content)
         self.assertIn('alt="Figure"', content)
+
+    def test_features_limitations_as_a_table_alongside_the_overview(self):
+        source = dedent("""\
+            ## What is the problem?（问题定义）
+
+            KV reload.
+
+            ## Why existing works fail?（现有方法的局限性）
+
+            | 方法 | 重叠争用处理 |
+            | --- | --- |
+            | SuperLoad | **跨请求让行** |
+
+            [实验说明](docs/comparison.md)
+            """)
+
+        overview, limitations = render_overview_parts(source)
+
+        self.assertIn("KV reload.", overview)
+        self.assertNotIn("跨请求让行", overview)
+        self.assertIn('<div class="table-scroll limitations-table"', limitations)
+        self.assertIn("<th>重叠争用处理</th>", limitations)
+        self.assertIn("<td><strong>跨请求让行</strong></td>", limitations)
+        self.assertIn('https://github.com/KimmoZAG/SuperLoad/blob/main/docs/comparison.md', limitations)
 
     def test_poster_uses_the_late_arrival_direct_measurement_for_both_bars(self):
         measurements = {

@@ -34,13 +34,14 @@ class RenderOverviewTest(unittest.TestCase):
         content = render_overview(dedent("""\
             ## Motivation
 
-            [Methods](docs/prefix-reload.md#复现) · [Paper](https://example.org/paper)
+            [Methods](docs/prefix-reload.md#复现) · [Paper](https://example.org/paper) · [References](docs/references.md)
 
             ![Figure](https://example.org/chart.svg)
             """))
 
         self.assertIn('href="https://github.com/KimmoZAG/SuperLoad/blob/main/docs/prefix-reload.md#', content)
         self.assertIn('href="https://example.org/paper"', content)
+        self.assertIn('href="#references"', content)
         self.assertIn('src="https://example.org/chart.svg"', content)
         self.assertIn('alt="Figure"', content)
 

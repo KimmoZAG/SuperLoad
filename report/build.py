@@ -130,8 +130,10 @@ def main():
         ),
     )
     overview = render_overview((ROOT / "overview.md").read_text(encoding="utf-8"))
+    references = render_overview((ROOT / "docs" / "references.md").read_text(encoding="utf-8"))
     report = (template.replace("@@POSTER_RESULTS@@", render_poster_results(compare_summary))
               .replace("@@OVERVIEW@@", overview)
+              .replace("@@REFERENCES@@", references)
               .replace("@@MOTIVATION@@", recompute.render_card(recompute_pairs))
               .replace("@@RECOMPUTE_CROSSOVER@@", recompute_chart)
               .replace("@@PREFIX_RESULTS@@", prefix_chart)

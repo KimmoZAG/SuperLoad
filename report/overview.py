@@ -30,7 +30,8 @@ def render_overview(source):
                 token.tag = f"h{min(int(token.tag[1:]) + 1, 6)}"
             for inline in token.children or ():
                 if inline.type == "link_open":
-                    inline.attrSet("href", urljoin(GITHUB_OVERVIEW, inline.attrGet("href")))
+                    href = inline.attrGet("href")
+                    inline.attrSet("href", "#references" if href == "docs/references.md" else urljoin(GITHUB_OVERVIEW, href))
                 elif inline.type == "image":
                     source = inline.attrGet("src")
                     if source.startswith(PAGES_FIGURES):

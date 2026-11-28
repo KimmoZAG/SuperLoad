@@ -6,7 +6,7 @@ Agent 会话间歇推进，不同任务积累的可复用上下文规模各异�
 
 SuperLoad 按页合并文件读取，把存储读和 H2D 放在两个有界阶段，并优先推进已到达的低回载量请求。它为 Direct I/O、Buffered I/O 普通缓冲和 CANN 锁页缓冲选择对应的分块和传输方式。
 
-[研究概览](overview.md) · [实验方法](docs/comparison.md) · [公开报告](https://kimmozag.github.io/SuperLoad/) · [仓库结构](docs/repository.md)
+[研究概览](overview.md) · [实验方法](docs/comparison.md) · [参考文献](docs/references.md) · [公开报告](https://kimmozag.github.io/SuperLoad/) · [仓库结构](docs/repository.md)
 
 ## 实测结果
 

@@ -2,7 +2,9 @@
 
 ## What is the problem?（问题定义）
 
-Agent 会话间歇推进，不同任务积累的可复用上下文规模各异。高速缓存容量有限，部分前缀 KV 会留在存储层。会话续接时，回载量不同的请求可能共用一条加载通路。按整请求串行回载时，已经开始的高回载量请求会占用通路，后到的低回载量请求只能等前者完成。
+Agent 会话间歇推进，不同任务积累的可复用上下文规模各异。应用服务和生产轨迹研究记录了多步骤调用、历史 KV 复用以及不同请求类型的复用差异。 [Parrot](https://www.usenix.org/conference/osdi24/presentation/lin-chaofan) · [CachedAttention](https://www.usenix.org/conference/atc24/presentation/gao-bin-cost) · [KVCache Cache in the Wild](https://www.usenix.org/conference/atc25/presentation/wang-jiahao)
+
+高速缓存容量有限，部分前缀 KV 会留在存储层。会话续接时，回载量不同的请求可能共用一条加载通路。按整请求串行回载时，已经开始的高回载量请求会占用通路，后到的低回载量请求只能等前者完成。
 
 **如何缩短低回载量请求因高回载量请求占用通路而产生的等待，从而降低低回载量组的 KV 就绪尾延迟？**
 
@@ -16,7 +18,7 @@ Agent 会话间歇推进，不同任务积累的可复用上下文规模各异�
 
 低回载量请求自身需要搬运的数据较少。排在正在执行的高回载量请求后面时，它还要承担前者剩余的服务时间。同一个请求仅因到达顺序不同，就可能在一次续接中很快就绪，在另一次续接中长时间等待。
 
-当这段等待超过无争用回载相对于重算节省的时间，缓存命中就会失去延迟优势。存储层扩大了可复用前缀的范围，共享通路决定这些命中能否及时转化为更快的会话续接。评估分层 KV Cache 的收益时，因而需要结合命中后的 KV 就绪尾延迟与直接重算耗时。
+当这段等待超过无争用回载相对于重算节省的时间，缓存命中就会失去延迟优势。存储层扩大了可复用前缀的范围，共享通路决定这些命中能否及时转化为更快的会话续接。已有研究通过压缩传输或部分重算减少搬运开销。本实验测量混合回载量请求的 KV 就绪尾延迟，并将回载耗时与论文中的 prefill 参考时间对照。 [CacheGen](https://doi.org/10.1145/3651890.3672274) · [KVPR](https://aclanthology.org/2025.findings-acl.997/) · [ThunderServe 附录 H](https://proceedings.mlsys.org/paper_files/paper/2025/file/c2a0e26dd9ee7d57e92bb1c24b39659a-Paper-Conference.pdf)
 
 ## Why existing works fail?（现有方法的局限性）
 
@@ -30,6 +32,8 @@ Agent 会话间歇推进，不同任务积累的可复用上下文规模各异�
 在本机回载实现中，Bidaw 能在多个待发请求之间分配服务顺序，这个决定在请求进入搬运通路前作出。Strata I/O 和 Libra 则改善已经开始的搬运。尤其是 Libra，已经能协调读取和 H2D 两个阶段，但流水中的资源仍服务于同一个请求。 [Bidaw §3.2](https://www.usenix.org/system/files/fast26-hu-shipeng.pdf) · [Strata §4.2.1](https://www.usenix.org/system/files/osdi26-xie-zhiqiang.pdf) · [Libra §4.2–4.3](https://www.usenix.org/system/files/nsdi26-ruan-libra.pdf)
 
 当高回载量请求已经占用通路、低回载量请求随后到达时，**两个问题同时出现：该让哪个请求继续，以及该把通路上的哪部分资源交给它。** SuperLoad 把这两个决策放在一起。这样，后到请求可以在高回载量请求完成前推进，而高回载量请求仍能沿流水线继续搬运。
+
+[相关工作与参考文献](docs/references.md)
 
 ## What is your key idea?（核心思想）
 
@@ -45,7 +49,7 @@ SuperLoad 采用一条由同一调度器管理的两阶段回载流水线。请�
 
 ## What is the experimental plan?（实验设计）
 
-我们采用 **Mooncake 公开的 Tool & Agent 线上请求轨迹**作为负载来源。依据轨迹中的前缀复用关系进行分层缓存回放，筛选 HBM 和主机 DRAM 未命中、需要从存储回载的请求。选取 16 对未参与调参的请求，每对包含一个低回载量请求和一个高回载量请求，分别在「同时到达」和「高回载量请求早到 25 ms」两种条件下回放。这样可以在保持回载内容一致的条件下，观察到达顺序如何影响共享通路上的争用。 [Mooncake 公开轨迹](https://github.com/kvcache-ai/Mooncake/blob/main/FAST25-release/README.md)
+我们采用 **Mooncake 公开的 Tool & Agent 线上请求轨迹**作为负载来源。依据轨迹中的前缀复用关系进行分层缓存回放，筛选 HBM 和主机 DRAM 未命中、需要从存储回载的请求。选取 16 对未参与调参的请求，每对包含一个低回载量请求和一个高回载量请求，分别在「同时到达」和「高回载量请求早到 25 ms」两种条件下回放。这样可以在保持回载内容一致的条件下，观察到达顺序如何影响共享通路上的争用。 [Mooncake 论文](https://www.usenix.org/conference/fast25/presentation/qin) · [Mooncake 公开轨迹](https://github.com/kvcache-ai/Mooncake/blob/main/FAST25-release/README.md)
 
 在昇腾 910B2 上，我们将 SuperLoad 与**原生 FIFO、Bidaw、Strata I/O、Libra 和原 SuperLoad**对比。原生 FIFO 提供整请求串行基线，Bidaw、Strata I/O 和 Libra 分别代表请求排序、存储布局和搬运流水三种思路，原 SuperLoad 用于衡量新设计相对固定分块轮转的增益。六种方法在同一批请求上交错运行两轮，覆盖 Buffered I/O 普通缓冲、Buffered I/O 锁页缓冲和 Direct I/O 三种配置。 [实验协议](https://github.com/KimmoZAG/SuperLoad/blob/main/docs/comparison.md)
 

@@ -47,7 +47,11 @@ SuperLoad 采用一条由同一调度器管理的两阶段回载流水线。请�
 
 ## What is the experimental plan?（实验设计）
 
-将同一批 16 对留出请求在三种 I/O／缓冲配置下运行两轮，分别复测「同时到达」和「高回载量请求早到 25 ms」。六种方法随机交错，比较两组 HBM 就绪 P95 与双请求吞吐。 [完整实验协议](docs/comparison.md)
+我们采用 **Mooncake 公开的 Tool & Agent 线上请求轨迹**作为负载来源。依据轨迹中的前缀复用关系进行分层缓存回放，筛选 HBM 和主机 DRAM 未命中、需要从存储回载的请求。选取 16 对未参与调参的请求，每对包含一个低回载量请求和一个高回载量请求，分别在「同时到达」和「高回载量请求早到 25 ms」两种条件下回放。这样可以在保持回载内容一致的条件下，观察到达顺序如何影响共享通路上的争用。 [Mooncake 公开轨迹](https://github.com/kvcache-ai/Mooncake/blob/main/FAST25-release/README.md)
+
+在昇腾 910B2 上，我们将 SuperLoad 与**原生 FIFO、Bidaw、Strata I/O、Libra 和原 SuperLoad**对比。原生 FIFO 提供整请求串行基线，Bidaw、Strata I/O 和 Libra 分别代表请求排序、存储布局和搬运流水三种思路，原 SuperLoad 用于衡量新设计相对固定分块轮转的增益。六种方法在同一批请求上交错运行两轮，覆盖 Buffered I/O 普通缓冲、Buffered I/O 锁页缓冲和 Direct I/O 三种配置。 [实验协议](https://github.com/KimmoZAG/SuperLoad/blob/main/docs/comparison.md)
+
+我们用**低回载量组 HBM 就绪 P95**衡量后到请求是否更早就绪，并同时报告**高回载量组 HBM 就绪 P95**和**双请求吞吐**，检验这项收益能否与整体回载效率同时取得。
 
 ## What is the takeaway?（主要结论与启示）
 

@@ -52,4 +52,4 @@ HBM 就绪 P95 从请求到达到最后一段 H2D 完成，包含在途等待。
 | Direct I/O · 普通缓冲 | 同时到达 | 287.20（Bidaw）→ 157.34 | 1861.33（Strata I/O）→ 1299.80 | 0.283（Strata I/O）→ 0.343 |
 | Direct I/O · 普通缓冲 | 高回载量请求早到 25 ms | 558.63（原 SuperLoad）→ 229.38 | 1802.24（Strata I/O）→ 1210.80 | 0.282（Strata I/O）→ 0.374 |
 
-[完整逐方法图与表](https://kimmozag.github.io/SuperLoad/#comparison) · [同时到达 PDF](https://kimmozag.github.io/SuperLoad/figures/method-comparison-0ms.pdf) · [高回载量请求早到 25 ms PDF](https://kimmozag.github.io/SuperLoad/figures/method-comparison-25ms.pdf) · [原始测量](https://github.com/KimmoZAG/SuperLoad/releases/tag/results-superload-910b2-2026-11-28) · [复现命令](../README.md#运行方法对照)
+[完整逐方法图与表](https://kimmozag.github.io/SuperLoad/#comparison) · [同时到达 PDF](https://kimmozag.github.io/SuperLoad/figures/method-comparison-0ms.pdf) · [高回载量请求早到 25 ms PDF](https://kimmozag.github.io/SuperLoad/figures/method-comparison-25ms.pdf) · [原始测量](https://github.com/KimmoZAG/SuperLoad/releases/tag/results-superload-910b2-2026-11-28) · [复现与审计](reproduction.md)

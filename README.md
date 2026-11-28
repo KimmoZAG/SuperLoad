@@ -18,6 +18,20 @@ SuperLoad 按页合并文件读取，把存储读和 H2D 放在两个有界阶�
 
 [同时到达的图](https://kimmozag.github.io/SuperLoad/figures/method-comparison-0ms.svg) · [逐方法图表与精确数值](https://kimmozag.github.io/SuperLoad/#comparison) · [原始结果 Release](https://github.com/KimmoZAG/SuperLoad/releases/tag/results-superload-910b2-2026-11-28)
 
+## 审计与复现实验
+
+```bash
+# 下载固定的原始记录，无需 NPU 即可校验并重算指标
+python3 -m experiments audit --output runs/audit/published.json
+
+# 在具有 CANN 和 O_DIRECT 文件系统的昇腾机器复跑
+source /usr/local/Ascend/ascend-toolkit/set_env.sh
+python3 -m experiments reproduce --corpus data/reproduction --output runs/reproduction \
+  --device 0 --numa-node 2 --storage-label longhorn-ext4
+```
+
+真机入口固定正式测量的计划和源码提交，运行三种配置和全量 HBM 回读，并保存实际命令与环境。设备编号、NUMA 结点和存储标签可按现场调整。 [离线审计与完整复现说明](docs/reproduction.md)
+
 ## 运行方法对照
 
 使用 Linux 和 Python 3.10+。实测需要昇腾驱动、CANN 和支持 `O_DIRECT` 的文件系统。使用发布包内的 `plan.json` 可以复用论文图的同一批请求对，也可以从公开轨迹创建新的对照计划。
@@ -56,7 +70,7 @@ python3 report/build.py --comparison-results runs/compare
 
 默认构建从两份固定 GitHub Release 读取原始测量并校验 SHA-256。Pages 输出位于 `build/site/`，包含桌面和移动端 SVG、PDF、逐方法数值表和汇总 JSON。本地可用 `--comparison-results` 或 `--prefix-results` 覆盖对应批次。网页首屏、临界区间和对照图使用同一批正式复测。
 
-发布方法对照时，将 `plan.json`、`buffered.json`、`buffered-pinned.json`、`direct.json` 放在 ZIP 根目录。列出环境和实现校验值后，把 ZIP 上传为 Release 附件。用标签、附件名和 SHA-256 更新 [发布清单](report/comparison-results-release.json)。默认构建通过后推送 `main`，由 GitHub Actions 部署 Pages。
+发布方法对照时，将 `plan.json`、`buffered.json`、`buffered-pinned.json`、`direct.json`、`verification.json` 和 `implementation.sha256` 放在 ZIP 根目录，附测量环境。把 ZIP 上传为 Release 附件后，用标签、附件名、SHA-256 和测量提交更新 [发布清单](report/comparison-results-release.json)。审计和默认构建通过后推送 `main`，由 GitHub Actions 部署 Pages。
 
 [方法对照原始数据](https://github.com/KimmoZAG/SuperLoad/releases/tag/results-superload-910b2-2026-11-28) · [问题验证原始数据](https://github.com/KimmoZAG/SuperLoad/releases/tag/results-prefix-910b2-2026-11-27)
 

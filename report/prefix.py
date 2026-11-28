@@ -9,6 +9,7 @@ from statistics import median
 from matplotlib import pyplot as plt
 from matplotlib.ticker import LogLocator, NullFormatter, PercentFormatter, ScalarFormatter
 
+from comparison_data import p95
 from figures import HIGH_RELOAD_RANGE, LOW_RELOAD_RANGE, MODES, panel_title, save
 
 
@@ -18,11 +19,6 @@ CASES = {
     "large-first": (f"{HIGH_RELOAD_RANGE} first", "#C34E00", "-"),
     "large-first-25ms": (f"{HIGH_RELOAD_RANGE} 25 ms earlier", "#008463", "-."),
 }
-
-
-def p95(values):
-    ordered = sorted(values)
-    return ordered[math.ceil(0.95 * len(ordered)) - 1]
 
 
 def read(directory):

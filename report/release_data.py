@@ -20,6 +20,7 @@ class ResultsRelease:
     tag: str
     asset: str
     sha256: str
+    commit: str | None = None
 
     @classmethod
     def read(cls, manifest):
@@ -33,12 +34,16 @@ class ResultsRelease:
         return archive.is_file() and hashlib.sha256(archive.read_bytes()).hexdigest() == self.sha256
 
     @contextmanager
-    def unpack(self, cache):
+    def unpack(self, cache, *, archive=None):
         cache.mkdir(parents=True, exist_ok=True)
-        archive = cache / f"{self.sha256}.zip"
+        local = archive is not None
+        if archive is None:
+            archive = cache / f"{self.sha256}.zip"
         with tempfile.TemporaryDirectory(dir=cache) as work:
             temporary = Path(work)
             if not self.matches(archive):
+                if local:
+                    raise ValueError(f"SHA-256 mismatch for {archive}")
                 incoming = temporary / "download.zip"
                 request = Request(self.asset_url, headers={"User-Agent": "SuperLoad report"})
                 with urlopen(request, timeout=25) as response, incoming.open("wb") as handle:

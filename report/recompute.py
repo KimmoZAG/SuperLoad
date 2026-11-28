@@ -1,6 +1,7 @@
 """Compare measured reload latency with a swept recompute reference."""
 
 from collections import defaultdict
+from math import ceil, floor, log10
 from statistics import median
 
 from figures import INK, LOW_RELOAD_RANGE, MUTED, panel_title, save
@@ -22,6 +23,50 @@ def paired_latencies(run):
     return [(median(samples[pair, "superload"]), median(samples[pair, "fifo"])) for pair in run["pairs"]]
 
 
+def crossover_count(pairs, reference):
+    return sum(opt < reference < fifo for opt, fifo in pairs)
+
+
+def render_card(pairs):
+    reference = REFERENCE_MS / 1000
+    optimized, fifo = zip(*pairs)
+    lower = floor(log10(min(min(optimized), min(fifo), reference) / 1.1))
+    upper = ceil(log10(max(max(optimized), max(fifo), reference) * 1.1))
+
+    def position(seconds):
+        return 100 * (log10(seconds) - lower) / (upper - lower)
+
+    rows = []
+    for method, label, samples in (
+        ("optimized", "优化后 SuperLoad", optimized), ("fifo", "原生 FIFO", fifo),
+    ):
+        start, end = min(samples), max(samples)
+        rows.append(
+            f'<div class="crossover-label">{label}<span>{start * 1000:,.0f}–{end * 1000:,.0f} ms</span></div>'
+            '<div class="crossover-lane" aria-hidden="true">'
+            f'<span class="crossover-range crossover-range-{method}" '
+            f'style="--start:{position(start):.3f}%;--end:{position(end):.3f}%"></span></div>'
+        )
+    decades = sorted({lower, (lower + upper) // 2, upper})
+    ticks = "".join(
+        f'<span style="--tick:{100 * (exponent - lower) / (upper - lower):.3f}%">{10 ** exponent:g}</span>'
+        for exponent in decades
+    )
+    return (
+        '<div class="crossover-finding">'
+        f'<strong>{crossover_count(pairs, reference)}/{len(pairs)} <span>对</span></strong>'
+        f'<p>以 {REFERENCE_MS} ms 为重算参考，这些低回载量请求从「重算更快」变为「回载更快」。</p></div>'
+        '<figure class="crossover-preview">'
+        f'<div class="crossover-plot" style="--reference:{position(reference):.3f}%">'
+        '<div class="crossover-guide" aria-hidden="true"><span>重算参考</span></div>'
+        f'{"".join(rows)}'
+        '<div class="crossover-units" aria-hidden="true">耗时（秒，对数）</div>'
+        f'<div class="crossover-axis" aria-hidden="true">{ticks}</div>'
+        '</div><figcaption>逐对 HBM 就绪延迟的中位数范围</figcaption></figure>'
+        '<a href="#recompute-crossover">查看配对分布与论文参考 <span aria-hidden="true">↓</span></a>'
+    )
+
+
 def render(pairs, repeat, output):
     render_layout(pairs, repeat, output, mobile=False)
     render_layout(pairs, repeat, output, mobile=True)
@@ -35,7 +80,7 @@ def render_layout(pairs, repeat, output, *, mobile):
     edges = sorted({xmin, xmax, *measured})
     coverage = [sum(opt < (left + right) / 2 < fifo for opt, fifo in pairs) / len(pairs)
                 for left, right in zip(edges, edges[1:])]
-    reference_count = sum(opt < reference < fifo for opt, fifo in pairs)
+    reference_count = crossover_count(pairs, reference)
 
     if mobile:
         fig, (latency, crossover) = plt.subplots(2, 1, figsize=(5.1, 7.0))

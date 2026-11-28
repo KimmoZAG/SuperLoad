@@ -1,5 +1,6 @@
 """Render the completed research overview chapters for Pages."""
 
+from html import escape
 from urllib.parse import urljoin
 
 from markdown_it import MarkdownIt
@@ -8,15 +9,9 @@ from markdown_it import MarkdownIt
 GITHUB_OVERVIEW = "https://github.com/KimmoZAG/SuperLoad/blob/main/overview.md"
 RAW_OVERVIEW = "https://raw.githubusercontent.com/KimmoZAG/SuperLoad/main/overview.md"
 PAGES_FIGURES = "https://kimmozag.github.io/SuperLoad/figures/"
-LIMITATIONS = "Why existing works fail?（现有方法的局限性）"
 
 
 def render_overview(source):
-    overview, _ = render_overview_parts(source, feature_limitations=False)
-    return overview
-
-
-def render_overview_parts(source, *, feature_limitations=True):
     markdown = MarkdownIt("js-default").enable("table")
     tokens = markdown.parse(source)
     headings = [
@@ -24,15 +19,11 @@ def render_overview_parts(source, *, feature_limitations=True):
         if token.type == "heading_open" and token.tag == "h2" and token.level == 0
     ]
     chapters = []
-    limitations = ""
     for start, end in zip(headings, headings[1:] + [len(tokens)]):
         chapter = tokens[start:end]
         if len(chapter) == 3:
             continue
 
-        featured = feature_limitations and chapter[1].content == LIMITATIONS
-        if featured:
-            chapter = chapter[3:]
         for token in chapter:
             if token.type in ("heading_open", "heading_close"):
                 token.tag = f"h{min(int(token.tag[1:]) + 1, 6)}"
@@ -48,14 +39,13 @@ def render_overview_parts(source, *, feature_limitations=True):
                     inline.attrSet("loading", "lazy")
                     inline.attrSet("decoding", "async")
         body = markdown.renderer.render(chapter, markdown.options, {})
-        if featured:
-            limitations = body.replace(
-                "<table>", '<div class="table-scroll limitations-table" tabindex="0" role="region" '
-                'aria-label="回载方法的优化范围与争用处理"><table>',
-            ).replace("</table>", "</table></div>")
-        else:
-            chapters.append(f'<article class="overview-chapter">\n{body}</article>')
-    return "\n".join(chapters), limitations
+        label = escape(chapter[1].content, quote=True)
+        body = body.replace(
+            "<table>", '<div class="table-scroll overview-table" tabindex="0" role="region" '
+            f'aria-label="{label}"><table>',
+        ).replace("</table>", "</table></div>")
+        chapters.append(f'<article class="overview-chapter">\n{body}</article>')
+    return "\n".join(chapters)
 
 
 def render_poster_results(summary):

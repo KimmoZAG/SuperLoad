@@ -1,7 +1,8 @@
 import unittest
+from pathlib import Path
 from textwrap import dedent
 
-from report.overview import render_overview, render_overview_parts, render_poster_results
+from report.overview import render_overview, render_poster_results
 
 
 class RenderOverviewTest(unittest.TestCase):
@@ -43,7 +44,7 @@ class RenderOverviewTest(unittest.TestCase):
         self.assertIn('src="https://example.org/chart.svg"', content)
         self.assertIn('alt="Figure"', content)
 
-    def test_features_limitations_as_a_table_alongside_the_overview(self):
+    def test_renders_limitations_and_references_inside_collapsed_overview(self):
         source = dedent("""\
             ## What is the problem?（问题定义）
 
@@ -58,14 +59,19 @@ class RenderOverviewTest(unittest.TestCase):
             [实验说明](docs/comparison.md)
             """)
 
-        overview, limitations = render_overview_parts(source)
+        overview = render_overview(source)
+        template_path = Path(__file__).resolve().parents[1] / "report" / "static" / "index.html"
+        page = template_path.read_text(encoding="utf-8").replace("@@OVERVIEW@@", overview)
+        visible, remainder = page.split('<details class="poster-details">', 1)
+        details, _ = remainder.split("</details>", 1)
+        self.assertNotIn("现有方法的局限性", visible)
 
         self.assertIn("KV reload.", overview)
-        self.assertNotIn("跨请求让行", overview)
-        self.assertIn('<div class="table-scroll limitations-table"', limitations)
-        self.assertIn("<th>重叠争用处理</th>", limitations)
-        self.assertIn("<td><strong>跨请求让行</strong></td>", limitations)
-        self.assertIn('https://github.com/KimmoZAG/SuperLoad/blob/main/docs/comparison.md', limitations)
+        self.assertIn("<h3>Why existing works fail?（现有方法的局限性）</h3>", details)
+        self.assertIn('<div class="table-scroll overview-table"', details)
+        self.assertIn("<th>重叠争用处理</th>", details)
+        self.assertIn("<td><strong>跨请求让行</strong></td>", details)
+        self.assertIn('https://github.com/KimmoZAG/SuperLoad/blob/main/docs/comparison.md', details)
 
     def test_poster_uses_the_late_arrival_direct_measurement_for_both_bars(self):
         measurements = {

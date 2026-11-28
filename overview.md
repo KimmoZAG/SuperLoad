@@ -12,11 +12,9 @@ Agent 会话间歇推进，不同任务积累的可复用上下文规模各异�
 
 ## Why it matters?（问题重要性）
 
-**回载的延迟收益。** 命中存储层可以复用已有前缀 KV。回载还需要等待共享通路，当回载总耗时超过直接重算时，这次缓存命中就失去了延迟优势。
+命中存储层可以复用已有前缀 KV。共享通路上的排队可能让回载耗时超过直接重算，抵消复用的延迟收益。
 
-**配对证据。** 我们使用 Mooncake Tool & Agent 线上请求轨迹，通过分层缓存回放筛选存储回载请求。在昇腾 910B2 的 Direct I/O 实验中，高回载量请求早到 25 ms。对每对请求取两轮中位数，分别统计原生 FIFO 和 SuperLoad 下低回载量组的 HBM 就绪延迟。[数据与测量方法](docs/comparison.md) · [回载延迟与重算阈值](https://kimmozag.github.io/SuperLoad/#recompute-crossover)
-
-**重算参考。** ThunderServe 论文报告，LLaMA-30B 在 4 张 A40 上处理 1,024-token 输入时，非分离式基线的 prefill 耗时为 884 ms。以该论文值代入当前的配对延迟，20 对均满足「SuperLoad 回载 < 重算参考 < 原生 FIFO 回载」。这个结果描述给定参考值下的交叉条件。实际重算耗时随模型、输入和设备而变。[ThunderServe，MLSys 2025，附录 H 表 5](https://proceedings.mlsys.org/paper_files/paper/2025/file/c2a0e26dd9ee7d57e92bb1c24b39659a-Paper-Conference.pdf)
+在基于 Mooncake Tool & Agent 线上请求轨迹的昇腾 910B2 Direct I/O 实验中，高回载量请求早到 25 ms 时，同一批低回载量请求的 HBM 就绪 P95 在原生 FIFO 下为 **4.014 秒**，在 SuperLoad 下为 **0.549 秒**。[回载与重算对照图](https://kimmozag.github.io/SuperLoad/#recompute-crossover) · [实验设置](docs/comparison.md)
 
 ## Why existing works fail?（现有方法的局限性）
 

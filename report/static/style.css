@@ -247,4 +247,5 @@ h3 { font-size: 1.15rem; margin-bottom: .5rem; }
 .resources, figcaption { display: flex; flex-wrap: wrap; gap: .35rem 1.1rem; font-size: .875rem; }
 .resources { margin-top: .65rem; }
 figcaption { justify-content: flex-end; padding: .12rem .35rem; }
+.figure-note { flex: 1 1 22rem; color: var(--muted); }
 .resources a, figcaption a { color: var(--link); text-underline-offset: .17em; }

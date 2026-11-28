@@ -35,7 +35,7 @@ def svg_data_url(path):
     return "data:image/svg+xml;base64," + b64encode(path.read_bytes()).decode("ascii")
 
 
-def figure(directory, name, alt):
+def figure(directory, name, alt, *, note=""):
     label = html.escape(alt)
     # Keep the report readable even when individual figure requests fail.
     desktop = svg_data_url(directory / f"{name}.svg")
@@ -44,7 +44,7 @@ def figure(directory, name, alt):
         '<figure class="paper-figure"><picture>'
         f'<source media="(max-width: 48rem)" srcset="{mobile}">'
         f'<img src="{desktop}" alt="{label}" decoding="async"></picture>'
-        f'<figcaption><a href="figures/{name}.svg" aria-label="{label} SVG">SVG</a>'
+        f'<figcaption>{note}<a href="figures/{name}.svg" aria-label="{label} SVG">SVG</a>'
         f'<a href="figures/{name}.pdf" aria-label="{label} PDF">PDF</a></figcaption></figure>'
     )
 
@@ -127,12 +127,19 @@ def main():
         description += "。包含 Buffered I/O 普通缓冲、Direct I/O 和 Buffered I/O 锁页缓冲。"
     charts = arrival_figures(figures, "method-comparison", description)
     prefix_chart = figure(figures, "tool-agent-prefix", "两组请求的共现率与低回载量组就绪延迟")
-    recompute_chart = figure(figures, "recompute-crossover", "低回载量组的回载延迟实测分布与重算参考时间下的配对比例")
+    recompute_chart = figure(
+        figures, "recompute-crossover", "低回载量组的回载延迟实测分布与重算参考时间下的配对比例",
+        note=(
+            f'<span class="figure-note">虚线为外部 prefill 参考 {recompute.REFERENCE_MS} ms'
+            '（LLaMA-30B，4 张 A40，1,024 tokens）。'
+            '<a href="https://proceedings.mlsys.org/paper_files/paper/2025/file/'
+            'c2a0e26dd9ee7d57e92bb1c24b39659a-Paper-Conference.pdf">ThunderServe · 表 5</a></span>'
+        ),
+    )
     overview = render_overview((ROOT / "overview.md").read_text(encoding="utf-8"))
     report = (template.replace("@@POSTER_RESULTS@@", render_poster_results(compare_summary))
               .replace("@@OVERVIEW@@", overview)
               .replace("@@RECOMPUTE_CROSSOVER@@", recompute_chart)
-              .replace("@@RECOMPUTE_REFERENCE_MS@@", str(recompute.REFERENCE_MS))
               .replace("@@PREFIX_RESULTS@@", prefix_chart)
               .replace("@@LOW_RELOAD_RANGE@@", LOW_RELOAD_RANGE)
               .replace("@@HIGH_RELOAD_RANGE@@", HIGH_RELOAD_RANGE)

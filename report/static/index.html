@@ -26,7 +26,8 @@
         <div class="poster-intro">
           <p class="poster-context">Agent 前缀 KV Cache · 昇腾 910B2</p>
           <h1 id="overview-title">KV 前缀回载中的<br>队首阻塞</h1>
-          <p class="poster-question">高回载量请求先占用通道时，如何缩短低回载量请求的尾延迟？</p>
+          <p class="poster-background">Agent 会话间歇推进，可复用上下文规模各异。高速缓存容量有限，续接请求可能从存储回载并争用通路。</p>
+          <p class="poster-question">如何缩短低回载量请求因高回载量请求占用通路而产生的等待，从而降低低回载量组的 KV 就绪尾延迟？</p>
           <ol class="reload-path" aria-label="KV 回载路径">
             <li>存储</li>
             <li>主机 DRAM</li>

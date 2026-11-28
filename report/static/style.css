@@ -64,11 +64,17 @@ h3 { font-size: 1.15rem; margin-bottom: .5rem; }
   font-weight: 800;
   margin: 0;
 }
-.poster-question {
-  max-width: 27rem;
-  margin: .9rem 0 1.05rem;
+.poster-background, .poster-question { max-width: 31rem; }
+.poster-background {
+  margin: .9rem 0 .45rem;
   color: var(--muted);
+  font-size: .92rem;
+}
+.poster-question {
+  margin: 0 0 1.05rem;
   font-size: clamp(.98rem, 1.55vw, 1.12rem);
+  font-weight: 650;
+  text-wrap: balance;
 }
 .reload-path {
   display: flex;

@@ -17,9 +17,9 @@ def paired_latencies(run):
     samples = defaultdict(list)
     for trial in run["trials"]:
         for row in trial:
-            if row["gap_ms"] == 25 and row["method"] in ("chunk-rr", "fifo"):
+            if row["gap_ms"] == 25 and row["method"] in ("superload", "fifo"):
                 samples[row["pair"], row["method"]].append(row["requests"]["small"]["ready_ms"] / 1000)
-    return [(median(samples[pair, "chunk-rr"]), median(samples[pair, "fifo"])) for pair in run["pairs"]]
+    return [(median(samples[pair, "superload"]), median(samples[pair, "fifo"])) for pair in run["pairs"]]
 
 
 def render(pairs, repeat, output):

@@ -16,14 +16,16 @@ from pathlib import Path
 
 from ..dataset.corpus import generate, open_corpus, page_bytes, read_manifest
 from ..dataset.prefix import GEOMETRY, LARGE_MIN, SMALL_MAX
-from ..hardware.device import Ascend, CPU, HostBuffer
+from ..hardware.device import Ascend, CPU, stage_buffer
 from ..schemes.bidaw import disk_hrrn
 from ..schemes.libra import PipelinedSource
 from ..schemes.local import LocalSource
+from ..schemes.superload import ReloadPipeline, pipeline_config
 from .prefix import CORPUS_SEED, STAGGER_MS
 
 
 METHODS = ("fifo", "bidaw", "strata-io", "libra", "chunk-rr")
+ALL_METHODS = (*METHODS, "superload")
 GAPS_MS = (0, STAGGER_MS)
 LAYOUTS = ("layer-major", "page-first")
 HOST_BUFFERS = ("pageable", "pinned")
@@ -115,10 +117,10 @@ def verify(jobs, device, expected):
 
 
 def measure(args, plan, payload):
-    paired = getattr(args, "host_buffer", "pageable") == "paired"
-    if paired and (args.io != "buffered" or args.device == "cpu"):
-        raise ValueError("paired host buffers require Buffered I/O and an Ascend device")
-    host_buffers = HOST_BUFFERS if paired else HOST_BUFFERS[:1]
+    host = getattr(args, "host_buffer", "pageable")
+    if host != "pageable" and (args.io != "buffered" or args.device == "cpu"):
+        raise ValueError("pinned host buffers require Buffered I/O and an Ascend device")
+    host_buffers = HOST_BUFFERS if host == "paired" else (host,)
     pairs = plan["pairs"]
     page_count = len(plan["file_page_hashes"])
     if not pairs or plan["workload"] != "tool-agent-comparison" or plan["page_bytes"] != GEOMETRY.page_bytes:
@@ -145,44 +147,37 @@ def measure(args, plan, payload):
     with ExitStack() as stack:
         device = stack.enter_context(CPU() if args.device == "cpu" else Ascend(int(args.device)))
         base = stack.enter_context(device.allocate(length))
-        def allocate_stager(size, host_buffer):
-            if host_buffer == "pinned":
-                buffer = stack.enter_context(device.allocate_host(size))
-            else:
-                buffer = HostBuffer(size)
-                stack.callback(buffer.close)
-            for offset in range(0, size, os.sysconf("SC_PAGESIZE")):
-                buffer.view[offset] = 0
-            return buffer
-
         files = {}
         for layout in LAYOUTS:
             fd = open_corpus(corpus, layout, GEOMETRY, args.io, page_count=page_count)
             stack.callback(os.close, fd)
             files[layout] = fd
-        sources = {}
-        libra_buffers = {}
+        candidates = {}
+        controls = {}
         native_layout, strata_layout = LAYOUTS
+        executor = stack.enter_context(ThreadPoolExecutor(max_workers=1))
         for host_buffer in host_buffers:
-            stager = allocate_stager(length, host_buffer)
-            by_layout = {
-                layout: LocalSource(fd, stager, device, GEOMETRY, layout, page_count)
-                for layout, fd in files.items()
-            }
-            sources[host_buffer] = by_layout
-            libra_buffers[host_buffer] = [
-                LocalSource(files[native_layout], allocate_stager(chunk_size, host_buffer),
+            pinned = host_buffer == "pinned"
+            stager = stage_buffer(stack, device, length, pinned=pinned)
+            native, strata = [LocalSource(files[layout], stager, device, GEOMETRY, layout, page_count)
+                              for layout in LAYOUTS]
+            buffers = [
+                LocalSource(files[native_layout], stage_buffer(stack, device, chunk_size, pinned=pinned),
                             device, GEOMETRY, native_layout, page_count)
                 for _ in range(2)
             ]
-        executor = stack.enter_context(ThreadPoolExecutor(max_workers=1))
-        warm = pairs[selected[0]]["small"]
-        loaders = {}
-        for host_buffer, by_layout in sources.items():
-            libra = PipelinedSource(executor, libra_buffers[host_buffer], args.chunk_blocks, GEOMETRY.page_bytes)
-            loaders[host_buffer] = {"strata-io": by_layout[strata_layout], "libra": libra}
-            for source in (*by_layout.values(), libra):
-                source.load(warm, base)
+            libra = PipelinedSource(executor, buffers, args.chunk_blocks, GEOMETRY.page_bytes)
+            controls[host_buffer] = {name: {"strata-io": strata, "libra": libra}.get(name, native)
+                                     for name in METHODS}
+            config = pipeline_config(args.io, host_buffer, cpu=args.device == "cpu")
+            candidates[host_buffer] = ReloadPipeline(stack, device, files[strata_layout], page_count,
+                                                     config, getattr(args, "numa_node", None))
+        memory = {name: candidate.memory() for name, candidate in candidates.items()}
+        if args.io == "buffered":
+            warm_blocks = 4
+            scratch = stage_buffer(stack, device, warm_blocks * GEOMETRY.page_bytes)
+            warmers = [LocalSource(files[layout], scratch, device, GEOMETRY, layout, page_count)
+                       for layout in LAYOUTS]
 
         for trial in range(args.repeat):
             order = selected.copy()
@@ -191,27 +186,28 @@ def measure(args, plan, payload):
             for pair_id in order:
                 pair = pairs[pair_id]
                 if args.io == "buffered":
-                    for source in sources["pageable"].values():
-                        source.read(pair["small"] + pair["large"])
-                conditions = list(product(GAPS_MS, METHODS, host_buffers))
+                    pages = sorted(pair["small"] + pair["large"])
+                    for source in warmers:
+                        for offset in range(0, len(pages), warm_blocks):
+                            source.read(pages[offset:offset + warm_blocks])
+                conditions = list(product(GAPS_MS, ALL_METHODS, host_buffers))
                 rng.shuffle(conditions)
                 expected = {}
                 for gap, method, host_buffer in conditions:
-                    native = sources[host_buffer][native_layout]
-                    loader = loaders[host_buffer].get(method, native)
-                    row, jobs = execute(pair, gap, method, loader, base, args.chunk_blocks)
-                    verified = verify(jobs, device, expected) if trial == 0 or pair_id == order[0] else 0
-                    if paired:
-                        row["host_buffer"] = host_buffer
+                    if method == "superload":
+                        row, jobs = candidates[host_buffer].run(pair, gap, base)
+                    else:
+                        row, jobs = execute(pair, gap, method, controls[host_buffer][method], base, args.chunk_blocks)
+                    verified = verify(jobs, device, expected)
                     records.append({"pair": pair_id, "gap_ms": gap, "method": method,
-                                    "verified_blocks": verified, **row})
+                                    "host_buffer": host_buffer, "verified_blocks": verified, **row})
             trials.append(records)
             print(f"{args.io}: completed trial {trial + 1}/{args.repeat}, {len(records)} controls",
                   file=sys.stderr, flush=True)
     return {
-        "schema": 2 if paired else 1, "profile": "tool-agent-comparison",
+        "schema": 3, "profile": "tool-agent-comparison",
         "plan_sha256": hashlib.sha256(payload).hexdigest(),
-        **({"host_buffers": list(host_buffers)} if paired else {}),
+        "host_buffers": list(host_buffers), "superload_memory": memory,
         "backend": "cpu" if args.device == "cpu" else "ascend", "io": args.io, "storage": args.storage_label,
         "run_seed": args.seed, "chunk_blocks": args.chunk_blocks, "pairs": selected, "trials": trials,
     }

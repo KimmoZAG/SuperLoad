@@ -39,8 +39,8 @@
 
       <div class="poster-evidence">
         <section class="poster-flow" aria-labelledby="poster-flow-title">
-          <h2 id="poster-flow-title">在块边界让出通道</h2>
-          <div class="timeline" role="img" aria-label="原生 FIFO 按请求调度，后到的低回载量请求需等待高回载量请求完成。SuperLoad 按块轮转，低回载量请求可在块边界获得通道。">
+          <h2 id="poster-flow-title">为低回载量请求保留调度机会</h2>
+          <div class="timeline" role="img" aria-label="原生 FIFO 按请求调度，后到的低回载量请求需等待高回载量请求完成。SuperLoad 拆分高回载量请求，优先推进已到达的低回载量请求。">
             <div class="timeline-arrival" aria-hidden="true"><span>低回载量请求到达</span></div>
             <div class="timeline-row" aria-hidden="true">
               <span>原生 FIFO</span>
@@ -82,8 +82,8 @@
             <p><strong>Strata I/O</strong> 合并相邻读。<strong>Libra 流水</strong> 重叠文件读取与 H2D。两者优化本次回载的搬运时间。</p>
           </article>
           <article>
-            <h3>块边界 · 调度让行</h3>
-            <p><strong>SuperLoad</strong> 在块边界轮转请求，让低回载量请求在高回载量请求完成之前推进。</p>
+            <h3>跨阶段 · 回载流水线</h3>
+            <p><strong>SuperLoad</strong> 结合页布局、有界分块与独立 H2D，优先推进已到达的低回载量请求。</p>
           </article>
         </div>
       </section>
@@ -102,8 +102,15 @@
       @@RECOMPUTE_CROSSOVER@@
     </section>
     <section id="comparison" aria-labelledby="comparison-title">
-      <h2 id="comparison-title">五种方法实测</h2>
+      <h2 id="comparison-title">六种方法实测</h2>
+      <p>六种方法在同一批 @@EXPERIMENT_SIZE@@ 上交错运行。图中的 SuperLoad (orig.) 为原 16 MiB 固定分块轮转，SuperLoad (opt.) 为优化后的流水线。</p>
+      <p>空心圆表示单轮，实心菱形表示各轮中位数。横轴为对数刻度，箭头标出改善方向。</p>
       <div class="figure-stack">@@COMPARISON@@</div>
+      <details class="comparison-tables">
+        <summary>查看六种方法的逐项数值</summary>
+        <p>普通 Buffered I/O 中，优化后 SuperLoad 使用 2 MiB 透明大页，对照沿用普通缓冲。Bidaw、Strata I/O、Libra 为本机回载机制实现。</p>
+        @@COMPARISON_TABLES@@
+      </details>
       <div class="resources">
         <a href="assets/comparison-summary.json" download>对照汇总 JSON</a>
         @@COMPARISON_DOWNLOAD@@

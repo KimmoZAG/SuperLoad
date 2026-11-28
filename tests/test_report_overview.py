@@ -48,7 +48,7 @@ class RenderOverviewTest(unittest.TestCase):
             "fifo": {
                 "small_p95": {"median": 4000}, "large_p95": {"median": 3800}, "gib_s": {"median": 0.14},
             },
-            "chunk-rr": {
+            "superload": {
                 "small_p95": {"median": 500}, "large_p95": {"median": 4500}, "gib_s": {"median": 0.13},
             },
         }

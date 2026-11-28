@@ -7,6 +7,7 @@ from markdown_it import MarkdownIt
 
 GITHUB_OVERVIEW = "https://github.com/KimmoZAG/SuperLoad/blob/main/overview.md"
 RAW_OVERVIEW = "https://raw.githubusercontent.com/KimmoZAG/SuperLoad/main/overview.md"
+PAGES_FIGURES = "https://kimmozag.github.io/SuperLoad/figures/"
 
 
 def render_overview(source):
@@ -29,7 +30,11 @@ def render_overview(source):
                 if inline.type == "link_open":
                     inline.attrSet("href", urljoin(GITHUB_OVERVIEW, inline.attrGet("href")))
                 elif inline.type == "image":
-                    inline.attrSet("src", urljoin(RAW_OVERVIEW, inline.attrGet("src")))
+                    source = inline.attrGet("src")
+                    if source.startswith(PAGES_FIGURES):
+                        inline.attrSet("src", f"figures/{source.removeprefix(PAGES_FIGURES)}")
+                    else:
+                        inline.attrSet("src", urljoin(RAW_OVERVIEW, source))
                     inline.attrSet("loading", "lazy")
                     inline.attrSet("decoding", "async")
         body = markdown.renderer.render(chapter, markdown.options, {})
@@ -41,7 +46,7 @@ def render_poster_results(summary):
     direct = summary["measurements"]["direct"]
     cases = direct["gaps"][25]
     fifo = cases["fifo"]
-    superload = cases["chunk-rr"]
+    superload = cases["superload"]
     longest = max(row["small_p95"]["median"] for row in (fifo, superload))
     small_rows = []
     for style, title, values in (("fifo", "原生 FIFO", fifo), ("superload", "SuperLoad", superload)):
@@ -58,7 +63,7 @@ def render_poster_results(summary):
     throughput_after = superload["gib_s"]["median"]
     return (
         '<section class="poster-results" aria-labelledby="poster-results-title">'
-        '<h2 id="poster-results-title">低回载量请求 P95</h2>'
+        '<h2 id="poster-results-title">低回载量组 HBM 就绪 P95</h2>'
         f'<ul class="result-bars">{"".join(small_rows)}</ul>'
         '<dl class="poster-tradeoffs">'
         f'<div><dt>高回载量请求 P95</dt><dd>{large_before:.2f} → {large_after:.2f} <small>s</small></dd></div>'

@@ -1,54 +1,52 @@
 # SuperLoad
 
-Agent 会话间歇推进，不同任务积累的可复用上下文规模各异。高速缓存容量有限，部分前缀 KV 会留在存储层。会话续接时，回载量不同的请求可能共用一条加载通路。按整请求串行回载时，已经开始的高回载量请求会占用通路，后到的低回载量请求只能等前者完成。
+Agent 会话间歇推进，不同任务积累的可复用上下文规模各异。高速缓存容量有限，部分前缀 KV 会留在存储层。会话续接时，回载量不同的请求可能共用一条加载通路。
 
 **如何缩短低回载量请求因高回载量请求占用通路而产生的等待，从而降低低回载量组的 KV 就绪尾延迟？**
 
-SuperLoad 在昇腾 NPU 上以最多 16 MiB 的块为单位回载，在块边界轮转请求。
+SuperLoad 按页合并文件读取，把存储读和 H2D 放在两个有界阶段，并优先推进已到达的低回载量请求。它为 Direct I/O、Buffered I/O 普通缓冲和 CANN 锁页缓冲选择对应的分块和传输方式。
 
-[研究问题](overview.md) · [实验方法](docs/comparison.md) · [仓库结构](docs/repository.md)
+[研究概览](overview.md) · [实验方法](docs/comparison.md) · [公开报告](https://kimmozag.github.io/SuperLoad/) · [仓库结构](docs/repository.md)
 
 ## 实测结果
 
-在单台昇腾 910B2 上，使用 Mooncake Tool & Agent 公开轨迹生成配对回载。回载量按单次请求实际需要从存储读取的 KV 字节数计，低回载量组为 **8–32 MiB**，高回载量组为 **≥128 MiB**。下图展示高回载量请求早到 25 ms 时，两组的 HBM 就绪 P95 与双请求吞吐。Buffered I/O 同批比较普通缓冲和 CANN 锁页缓冲。
+同一台昇腾 910B2 使用 Mooncake Tool & Agent 公开轨迹回放同一批请求对。对照包含原生 FIFO、Bidaw、Strata I/O、Libra、原 SuperLoad 和优化后的 SuperLoad。低回载量组为 8–32 MiB，高回载量组为 ≥128 MiB。
 
-![高回载量请求早到 25 ms 时五种方法在 Buffered I/O 普通缓冲、Direct I/O 和 Buffered I/O 锁页缓冲下的对照](https://kimmozag.github.io/SuperLoad/figures/method-comparison-25ms.svg)
+![高回载量请求早到 25 ms 时六种方法的两组 HBM 就绪 P95 和双请求吞吐](https://kimmozag.github.io/SuperLoad/figures/method-comparison-25ms.svg)
 
-Direct I/O 下，相比原生 FIFO，SuperLoad 将低回载量组的 P95 从 **4,014 ms** 降到 **549 ms**。高回载量组的 P95 从 3,916 ms 升到 4,775 ms，双请求吞吐从 0.124 GiB/s 降到 0.112 GiB/s。
+高回载量请求早到 25 ms 时，Direct I/O 的低回载量组 HBM 就绪 P95 从原生 FIFO 的 **4153.56 ms** 降至优化后 SuperLoad 的 **229.38 ms**。三种配置的正式复测中，优化后 SuperLoad 在 **18/18 项**指标上领先同批最强对照。
 
-Buffered I/O 锁页缓冲下，高回载量请求早到 25 ms 时，SuperLoad 将低回载量组 P95 从原生 FIFO 的 **230.9 ms** 降到 **23.4 ms**。同时到达时，Bidaw 的低回载量组 P95 最低（**36.7 ms**）。
-
-[同时到达的结果](https://kimmozag.github.io/SuperLoad/figures/method-comparison-0ms.svg) · [两种到达条件的完整图表](https://kimmozag.github.io/SuperLoad/#comparison) · [原始测量](https://github.com/KimmoZAG/SuperLoad/releases/tag/results-comparison-910b2-2026-11-28)
-
-## Direct I/O 补充对照
-
-在相同的 16 MiB 分块下，相比分块 FIFO，SuperLoad 在普通主机缓冲和 CANN 锁页路径下分别将低回载量组 P95 降低 **89.8%** 和 **89.2%**（高回载量请求早到 25 ms）。双请求吞吐分别下降 0.94% 和 0.34%。
-
-[实验设置与复现](docs/direct-io-ablation.md) · [原始测量](https://github.com/KimmoZAG/SuperLoad/releases/tag/results-direct-ablation-910b2-2026-11-28)
+[同时到达的图](https://kimmozag.github.io/SuperLoad/figures/method-comparison-0ms.svg) · [逐方法图表与精确数值](https://kimmozag.github.io/SuperLoad/#comparison) · [原始结果 Release](https://github.com/KimmoZAG/SuperLoad/releases/tag/results-superload-910b2-2026-11-28)
 
 ## 运行方法对照
 
-运行环境为 Linux、Python 3.10+ 和昇腾 910B2，设备测量需要 Ascend 驱动与 CANN。
+使用 Linux 和 Python 3.10+。实测需要昇腾驱动、CANN 和支持 `O_DIRECT` 的文件系统。使用发布包内的 `plan.json` 可以复用论文图的同一批请求对，也可以从公开轨迹创建新的对照计划。
 
 ```bash
 mkdir -p data
 curl -fLo data/toolagent_trace.jsonl \
   https://raw.githubusercontent.com/kvcache-ai/Mooncake/main/FAST25-release/traces/toolagent_trace.jsonl
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
-python3 -m superload prefix-comparison-plan --trace data/toolagent_trace.jsonl --output runs/compare/plan.json
-python3 -m superload prefix-compare --plan runs/compare/plan.json --corpus data/compare \
-  --io buffered --host-buffer paired --storage-label longhorn-ext4 --output runs/compare/buffered.json
-python3 -m superload prefix-compare --plan runs/compare/plan.json --corpus data/compare \
-  --io direct --pair-limit 20 --storage-label longhorn-ext4 --output runs/compare/direct.json
+python3 -m superload prefix-comparison-plan \
+  --trace data/toolagent_trace.jsonl --output runs/compare/plan.json
 ```
 
-结果写入 `runs/compare/`。Buffered I/O 同批运行两种主机缓冲，Direct I/O 使用普通缓冲。每种模式默认测量两轮，首次生成的两种 KV 文件布局合计约 15.4 GiB。Direct I/O 需要支持 `O_DIRECT` 的文件系统。
+三项命令使用同一计划、同一语料和相同的随机种子。发布实验使用 `--seed 20261128`，默认重复两轮。在原测量机上，普通 Buffered I/O 使用 `--numa-node 2`，其他机器可按 NPU 的 PCI NUMA 节点设置该参数。
 
-[问题验证的复现说明](docs/prefix-reload.md)
+```bash
+python3 -m superload prefix-compare --plan runs/compare/plan.json --corpus data/compare \
+  --io buffered --numa-node 2 --seed 20261128 --storage-label longhorn-ext4 \
+  --output runs/compare/buffered.json
+python3 -m superload prefix-compare --plan runs/compare/plan.json --corpus data/compare \
+  --io buffered --host-buffer pinned --seed 20261128 --storage-label longhorn-ext4 \
+  --output runs/compare/buffered-pinned.json
+python3 -m superload prefix-compare --plan runs/compare/plan.json --corpus data/compare \
+  --io direct --seed 20261128 --storage-label longhorn-ext4 --output runs/compare/direct.json
+```
 
-<a name="构建与发布"></a>
-<details>
-<summary>构建与发布报告</summary>
+[基准与指标说明](docs/comparison.md) · [单通道问题验证](docs/prefix-reload.md)
+
+## 构建与发布
 
 ```bash
 python3 -m pip install -r report/requirements.txt
@@ -56,23 +54,11 @@ python3 -m unittest discover -s tests -v
 python3 report/build.py --comparison-results runs/compare
 ```
 
-默认构建使用三份固定的 GitHub Release 附件，并校验 SHA-256。网页首屏海报的实测指标来自方法对照，展开区从 [overview.md](overview.md) 同步已填写的章节。输出位于 `build/site/`。用 `--comparison-results`、`--prefix-results` 或 `--direct-ablation-results` 可预览对应的本地复测。反复构建同一输出目录时，构建会清理已退役的旧图和静态文件。
+默认构建从两份固定 GitHub Release 读取原始测量并校验 SHA-256。Pages 输出位于 `build/site/`，包含桌面和移动端 SVG、PDF、逐方法数值表和汇总 JSON。本地可用 `--comparison-results` 或 `--prefix-results` 覆盖对应批次。网页首屏、临界区间和对照图使用同一批正式复测。
 
-发布方法对照时，将 `plan.json`、`buffered.json` 和 `direct.json` 放在 ZIP 根目录，可附环境记录。发布后更新 `report/comparison-results-release.json` 的标签、文件名和 SHA-256。重新发布问题验证时，更新 `report/prefix-results-release.json`。运行 `python3 report/build.py` 检查固定附件与网页，再推送 `main` 触发 Pages 部署。
+发布方法对照时，将 `plan.json`、`buffered.json`、`buffered-pinned.json`、`direct.json` 放在 ZIP 根目录。列出环境和实现校验值后，把 ZIP 上传为 Release 附件。用标签、附件名和 SHA-256 更新 [发布清单](report/comparison-results-release.json)。默认构建通过后推送 `main`，由 GitHub Actions 部署 Pages。
 
-```bash
-batch=YYYY-MM-DD
-tag="results-comparison-910b2-${batch}"
-archive="$PWD/runs/comparison-910b2-${batch}.zip"
-(cd runs/compare && python3 -m zipfile -c "$archive" plan.json buffered.json direct.json)
-gh release create "$tag" "$archive" --target "$(git rev-parse HEAD)" \
-  --title "Agent 前缀回载方法对照 · $batch" --notes "Ascend 910B2 原始配对测量" --latest=false
-sha256sum "$archive"
-```
-
-[方法对照原始数据](https://github.com/KimmoZAG/SuperLoad/releases/tag/results-comparison-910b2-2026-11-28) · [问题验证原始数据](https://github.com/KimmoZAG/SuperLoad/releases/tag/results-prefix-910b2-2026-11-27)
-
-</details>
+[方法对照原始数据](https://github.com/KimmoZAG/SuperLoad/releases/tag/results-superload-910b2-2026-11-28) · [问题验证原始数据](https://github.com/KimmoZAG/SuperLoad/releases/tag/results-prefix-910b2-2026-11-27)
 
 ## 维护者
 

@@ -2,15 +2,30 @@
 
 import ctypes as C
 import mmap
+import os
 from contextlib import contextmanager
+from pathlib import Path
 from types import SimpleNamespace
 
 
 class HostBuffer:
-    def __init__(self, size):
+    def __init__(self, size, *, huge_pages=False):
         # Anonymous mmap supplies the alignment required by O_DIRECT.
-        self.mapping = mmap.mmap(-1, size)
-        self.array = (C.c_ubyte * size).from_buffer(self.mapping)
+        if huge_pages:
+            alignment = 2 << 20
+            self.mapping = mmap.mmap(-1, size + alignment, flags=mmap.MAP_PRIVATE | mmap.MAP_ANONYMOUS)
+            pointer = C.c_ubyte.from_buffer(self.mapping)
+            offset = (-C.addressof(pointer)) % alignment
+            del pointer
+            try:
+                self.mapping.madvise(mmap.MADV_HUGEPAGE, offset, size)
+            except OSError:
+                self.mapping.close()
+                raise
+        else:
+            self.mapping = mmap.mmap(-1, size)
+            offset = 0
+        self.array = (C.c_ubyte * size).from_buffer(self.mapping, offset)
         self.address = C.addressof(self.array)
         self.view = memoryview(self.array).cast("B")
 
@@ -18,6 +33,58 @@ class HostBuffer:
         self.view.release()
         del self.array
         self.mapping.close()
+
+
+def stage_buffer(stack, device, size, *, pinned=False, huge_pages=False):
+    if pinned:
+        alignment = os.sysconf("SC_PAGESIZE")
+        raw = stack.enter_context(device.allocate_host(size + alignment))
+        offset = (-raw.address) % alignment
+        view = raw.view[offset:offset + size]
+        stack.callback(view.release)
+        slot = SimpleNamespace(address=raw.address + offset, view=view)
+    else:
+        slot = HostBuffer(size, huge_pages=huge_pages)
+        stack.callback(slot.close)
+    for offset in range(0, size, os.sysconf("SC_PAGESIZE")):
+        slot.view[offset] = 0
+    return slot
+
+
+def anonymous_huge_bytes(addresses):
+    total = 0
+    selected = False
+    with Path("/proc/self/smaps").open(encoding="ascii") as mappings:
+        for line in mappings:
+            if line.startswith("AnonHugePages:"):
+                if selected:
+                    total += int(line.split()[1]) * 1024
+            elif fields := line.split(maxsplit=1):
+                if "-" in fields[0]:
+                    start, end = (int(value, 16) for value in fields[0].split("-"))
+                    selected = any(start <= address < end for address in addresses)
+    return total
+
+
+@contextmanager
+def numa_affinity(node):
+    if node is None:
+        yield
+        return
+    previous = os.sched_getaffinity(0)
+    cores = set()
+    path = Path(f"/sys/devices/system/node/node{node}/cpulist")
+    for extent in path.read_text(encoding="ascii").strip().split(","):
+        limits = extent.split("-")
+        cores.update(range(int(limits[0]), int(limits[-1]) + 1))
+    allowed = previous & cores
+    if not allowed:
+        raise ValueError(f"no allowed CPU cores on NUMA node {node}")
+    os.sched_setaffinity(0, allowed)
+    try:
+        yield
+    finally:
+        os.sched_setaffinity(0, previous)
 
 
 class Ascend:

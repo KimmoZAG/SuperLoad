@@ -6,7 +6,7 @@ Agent 会话间歇推进，不同任务积累的可复用上下文规模各异�
 
 **如何缩短低回载量请求因高回载量请求占用通路而产生的等待，从而降低低回载量组的 KV 就绪尾延迟？**
 
-在基于 Mooncake Tool & Agent 线上请求轨迹的昇腾 910B2 Direct I/O 实验中，高回载量请求早到 25 ms 时，同一批低回载量请求的 HBM 就绪 P95 在原生 FIFO 下为 **4.014 秒**，在 SuperLoad 下为 **0.549 秒**。[实验设置](docs/comparison.md)
+基于 Mooncake Tool & Agent 线上请求轨迹的昇腾 910B2 Direct I/O 实验中，高回载量请求早到 25 ms 时，低回载量组 HBM 就绪 P95 在原生 FIFO 下为 **4.154 秒**，在优化后 SuperLoad 下为 **0.229 秒**。 [实验设置与逐方法结果](docs/comparison.md)
 
 ![左图为低回载量组在两种调度下的 HBM 就绪延迟分布，右图为不同重算参考耗时下的配对比例。](https://kimmozag.github.io/SuperLoad/figures/recompute-crossover.svg)
 
@@ -20,7 +20,7 @@ Agent 会话间歇推进，不同任务积累的可复用上下文规模各异�
 
 ## Why existing works fail?（现有方法的局限性）
 
-高回载量请求先占用共享 KV 回载通道时，后到的低回载量请求可能长时间排队。
+高回载量请求先占用共享 KV 回载通道时，后到的低回载量请求可能长时间排队。下列论文方法的比较范围是本机回载机制。
 
 - **原生 FIFO** 按到达顺序逐个完成回载。排在后面的低回载量请求必须等到先到的请求完成，形成队首阻塞。
 - **Bidaw** 按等待时间和回载量对待发请求排序。两组请求同时在队列中时可以重排，后到请求要等当前回载完成才有机会获得通道。[Bidaw §3.2](https://www.usenix.org/system/files/fast26-hu-shipeng.pdf)
@@ -31,8 +31,16 @@ Agent 会话间歇推进，不同任务积累的可复用上下文规模各异�
 
 ## What is your key idea?（核心思想）
 
+把一个回载请求拆成可调度的传输段，并让读取与 H2D 各自推进。高回载量请求占用某个传输段时，低回载量请求可以在下一次调度机会获得读取和拷贝资源。
+
 ## What is your design?（技术方案/系统设计）
+
+将同一 KV 页按 page-first 布局存放，排序后合并相邻读。请求最多占用预设数量的主机缓冲，H2D 完成后才归还缓冲。Direct I/O 在低回载量请求完成后使用较大的连续段。Buffered I/O 普通缓冲请求 2 MiB 透明大页，锁页缓冲使用 CANN 异步流。 [各模式参数](docs/comparison.md#优化后-superload-的配置)
 
 ## What is the experimental plan?（实验设计）
 
+将同一批 16 对留出请求在三种 I/O／缓冲配置下运行两轮，分别复测「同时到达」和「高回载量请求早到 25 ms」。六种方法随机交错，比较两组 HBM 就绪 P95 与双请求吞吐。 [完整实验协议](docs/comparison.md)
+
 ## What is the takeaway?（主要结论与启示）
+
+前缀回载的低回载量组尾延迟同时受调度与数据路径影响。较细的早期调度边界给后到请求提供服务机会，读取和 H2D 的重叠、相邻页合并与合适的主机缓冲支持大段续传。 [六种方法实测](https://kimmozag.github.io/SuperLoad/#comparison)

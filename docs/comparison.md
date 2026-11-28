@@ -1,48 +1,55 @@
-# Agent 前缀回载方法对照
+# Agent 前缀回载六种方法对照
 
-实验比较应用层队列、文件布局与传输粒度对低回载量请求和高回载量请求争用的影响。现象验证与缓存敏感性见 [前缀回载争用](prefix-reload.md)。
+在昇腾 910B2 上比较六种方案，从 Longhorn ext4 文件读入主机 DRAM，再将 KV 传入 HBM。配对使用同一批 Mooncake Tool & Agent 公开轨迹回放。 [单通道问题验证](prefix-reload.md) · [轨迹与字段](https://github.com/kvcache-ai/Mooncake/tree/main/FAST25-release)
 
-## 负载和到达条件
+## 负载与到达条件
 
-从 23,608 条 Mooncake Tool & Agent 请求生成回放。HBM、DRAM、存储层的模拟 KV 预算分别为 8、16、64 GiB，前 100 个时间窗用于预热。用相同的 LRU 模型找出存储命中且 HBM、DRAM 缺失的页，按每个请求实际需要从存储读取的 KV 字节数分组。低回载量组为 8–32 MiB，高回载量组为 ≥128 MiB。从两组同时出现的 232 个候选时间窗中随机抽取 24 对。当前模型与配置下，测量窗内的存储回载页未出现跨请求共享。公开时戳的分辨率约为 3 秒，组内细粒度顺序由实验控制。[轨迹与字段](https://github.com/kvcache-ai/Mooncake/tree/main/FAST25-release)
+使用固定的 64 对前缀回载计划，选取历史对照和优化确认均未使用的 16 个时间窗，每窗一对存储页互不重叠的请求。发布包中的计划记录源计划和排除计划的 SHA-256。回载量按实际读取 KV 字节数计，实验中低回载量请求为 8–32 MiB，高回载量请求为 136–504 MiB。文件中的 KV 内容由确定性字节生成器创建，两个布局保存相同逻辑内容。
 
-每对在两种条件下回放。第一种同时到达，FIFO 同时收到请求时先将高回载量请求入队。第二种高回载量请求早到 25 ms，低回载量请求可在通道被占用时到达。五种方法使用相同的页、字节和到达时刻。合成文件按抽样页号紧凑存放，读合并收益取决于实际部署的文件布局。两种 I/O 模式均重复两轮。Buffered I/O 测全部 24 对，每对先对两种文件布局预读，然后随机交错两种到达条件、五种方法和两种主机缓冲，共 20 个条件。Direct I/O 测从中抽取的 20 对，使用普通缓冲，绕过工作区客户端页缓存并随机执行每对的 10 个条件。
+每个请求对在「同时到达」和「高回载量请求早到 25 ms」下回放。两项请求同时到达时，整请求 FIFO 先服务高回载量请求。公开轨迹只提供约 3 秒粒度的时间窗，实验独立设置窗内到达间隔。三种 I/O／主机缓冲配置各测相同的 16 对请求、两轮。每轮打乱请求对顺序，每对随机交错六种方法和两种到达条件。
 
-## 方法
+## 对照方法
 
-| 方法 | 测量实现 |
+| 方法 | 实现 |
 | --- | --- |
-| 原生 FIFO | 按到达顺序整请求读取，文件使用 layer-major 布局。完成同步 H2D 后再处理下一请求。 |
-| Bidaw | 已知存储缺页量，用等待时间除以回载块数决定待服务请求的 Disk-HRRN 优先级。缓存模型固定，测量范围为论文的存储队列排序。 [论文 §3.2](https://www.usenix.org/system/files/fast26-hu-shipeng.pdf) |
-| Strata I/O | 使用 page-first 布局，按文件页位置排序并合并相邻读，按 FIFO 处理。共享页和模型批调度需要相应的工作负载。 [论文](https://www.usenix.org/conference/osdi26/presentation/xie-zhiqiang) |
-| Libra 流水 | 保留 FIFO，在请求内切成 16 MiB 块，两个 DRAM 缓冲交替工作。将论文的计算与跨实例 KV 传输流水移植到本机读文件和 H2D 两阶段。主线程拷入当前块，读线程并行读下一块。 [论文 §4.3](https://www.usenix.org/system/files/nsdi26-ruan-libra.pdf) |
-| SuperLoad | 使用固定分块轮转，采用与 Libra 相同的 16 MiB 块。每一块同步读入 DRAM 并拷入 HBM，然后在排队请求间轮转。在块结束时接纳本块执行期间到达的请求。 |
+| 原生 FIFO | 按到达顺序逐个完成请求。layer-major 文件读入 DRAM 后同步 H2D。 |
+| Bidaw | 用 Disk-HRRN 重排待发请求。 [论文 §3.2](https://www.usenix.org/system/files/fast26-hu-shipeng.pdf) |
+| Strata I/O | 使用 page-first 布局，按文件位置排序并合并相邻页，沿用 FIFO。 [论文 §4.2](https://www.usenix.org/system/files/osdi26-xie-zhiqiang.pdf) |
+| Libra | 在请求内每 16 MiB 切一块，两组缓冲交替重叠下一块文件读取和当前块 H2D。 [论文 §4.3](https://www.usenix.org/system/files/nsdi26-ruan-libra.pdf) |
+| 原 SuperLoad | 每次同步加载 16 MiB，在块边界重新接纳和轮转请求。 |
+| 优化后 SuperLoad | 使用 page-first 布局、低回载量优先、有界读队列和独立 H2D 阶段。 |
 
-## 主机缓冲
+三个论文方法均按本机回载路径移植所列机制。比较范围覆盖文件 I/O、主机缓冲、调度和 H2D。
 
-Buffered I/O 的两组都用 `preadv`，将页缓存中的数据读入各自预分配的普通缓冲或 `aclrtMallocHost` 缓冲，再同步传入 HBM。两组沿用相同的请求顺序规则、文件布局和传输粒度。Libra 保留双缓冲，读线程填充下一块时主线程传输当前块。锁页组预留一个 864 MiB 主缓冲和两个 16 MiB 的流水缓冲。
+## 优化后 SuperLoad 的配置
 
-## 指标和解释范围
+| I/O 与主机缓冲 | 分块与传输 | 主机缓冲池 |
+| --- | --- | ---: |
+| Buffered I/O 普通缓冲 | 8 MiB 首段，64 MiB 主体。一个读线程，一个同步 H2D 工作线程。请求本地 2 MiB 透明大页，并在测量前记录实际大页字节数。 | 192 MiB |
+| Buffered I/O CANN 锁页缓冲 | 16 MiB 首段，64 MiB 主体。三个读线程和两个 CANN 异步拷贝流。完成事件确认后才回收缓冲。 | 320 MiB |
+| Direct I/O 普通缓冲 | 8 MiB 首段，32 MiB 主体。低回载量请求完成后，高回载量后续段扩大至 128 MiB。一个读线程和一个同步 H2D 工作线程。 | 384 MiB |
 
-每对由同一逻辑 NPU 上的 AscendCL 写入 HBM。第一轮逐对逐条件回读两个请求的首末块，第二轮每个条件复核一对。文件 I/O、同步 H2D、排队与流水重叠分别计时。字节检查位于计时区间外。
+普通 Buffered I/O 对照使用原有普通缓冲，透明大页是优化后 SuperLoad 的配置。锁页组使用 CANN 锁页内存，Direct I/O 组用对齐普通缓冲接收文件直读。Buffered I/O 在每对开始前预热两种文件布局的页缓存。Direct I/O 绕过读取端的 Linux 页缓存，后端缓存仍可能影响耗时。
 
-每轮按最近秩法分别计算两组请求的 HBM 就绪 P95，报告各轮中位数并展示单轮值。吞吐使用两项请求都完成之前的累计窗口耗时和实际写入 HBM 字节。排队时延截止到请求首次获得工作线程，固定分块轮转中后续的等待计入就绪时延。流水重叠以相邻块的读阶段和 H2D 调用的时间交集计算。
+## 指标与范围
 
-实验只回放这条数据通路。低回载量请求以受控时差到达，模型计算、在线请求批处理和生产毫秒级到达顺序属于后续服务端评估范围。普通缓冲与锁页缓冲的变化以同批 Buffered I/O 数据为准。Direct I/O 来自原发布批次，使用不同的样本数，方法对比以同一 I/O 条件内的配对结果为准。
+HBM 就绪 P95 从请求到达到最后一段 H2D 完成，包含在途等待。每轮对各组按最近秩法计算 P95，本批 16 对对应轮内最大值。双请求吞吐用实际写入 HBM 的字节数除以累计双请求完成时间。图中空心圆是单轮值，实心菱形是两轮中位数。
 
-## 实测结果
+1,152 个计时窗口均在计时后验证两个请求的首末 HBM 页，并核对实际读写字节数。另选最小和最大两对请求，在三种配置及两种到达条件下逐次清零目标 HBM 后回载并逐字节回读，共验证 492 页。发布包中的 `verification.json` 给出 12 个全量校验窗口。
 
-每张图的三行依次为 Buffered I/O 普通缓冲、Direct I/O 普通缓冲和 Buffered I/O 锁页缓冲。三列为低回载量组 HBM 就绪 P95、高回载量组 HBM 就绪 P95 和双请求吞吐。
+实验覆盖单机双请求回载。服务端批处理、模型计算和真实毫秒级到达序列对应不同的实验口径。
 
-| 到达条件 | 图表 |
-| --- | --- |
-| 高回载量请求早到 25 ms | [SVG](https://kimmozag.github.io/SuperLoad/figures/method-comparison-25ms.svg) · [PDF](https://kimmozag.github.io/SuperLoad/figures/method-comparison-25ms.pdf) |
-| 同时到达 | [SVG](https://kimmozag.github.io/SuperLoad/figures/method-comparison-0ms.svg) · [PDF](https://kimmozag.github.io/SuperLoad/figures/method-comparison-0ms.pdf) |
+## 结果与复现
 
-- **高回载量请求早到 25 ms。** 在锁页缓冲下，相比原生 FIFO，SuperLoad 的低回载量组 P95 从 230.9 ms 降到 23.4 ms（−89.9%），高回载量组 P95 从 252.0 ms 升到 286.8 ms，双请求吞吐从 2.263 升到 2.303 GiB/s。Libra 流水的吞吐最高（2.336 GiB/s）。
-- **同时到达。** 在锁页缓冲下，Bidaw 的低回载量组 P95 最低（36.7 ms），SuperLoad 为 48.2 ms。两者的双请求吞吐分别为 2.222 和 2.311 GiB/s。
-- **缓冲路径的影响。** 高回载量请求早到 25 ms 时，改用锁页缓冲后，SuperLoad 每对请求的平均累计 H2D 耗时从 99.8 ms 降到 30.1 ms，低回载量组 P95 从 38.0 ms 降到 23.4 ms。同时到达时，SuperLoad 的低回载量组 P95 从 42.7 ms 升到 48.2 ms。
+每格为同一条件下该指标的最强对照和优化后 SuperLoad。优化后 SuperLoad 领先 **18/18 项**。
 
-高回载量请求早到 25 ms 时，原 Direct I/O 对照中 SuperLoad 将低回载量组 P95 从 4,014 ms 降到 549 ms，高回载量组 P95 从 3,916 ms 增至 4,775 ms，双请求吞吐从 0.124 GiB/s 降到 0.112 GiB/s。Strata I/O 将每对请求的平均读调用从 332.8 次降到 3.7 次。三种调度的锁页与分块消融见 [Direct I/O 补充对照](direct-io-ablation.md)。
+| I/O／缓冲 | 到达条件 | 8–32 MiB P95（ms） | ≥128 MiB P95（ms） | 双请求吞吐（GiB/s） |
+| --- | --- | ---: | ---: | ---: |
+| Buffered I/O · 普通缓冲 | 同时到达 | 72.82（Bidaw）→ 48.46 | 668.09（Libra）→ 237.02 | 0.679（Libra）→ 2.139 |
+| Buffered I/O · 普通缓冲 | 高回载量请求早到 25 ms | 123.55（原 SuperLoad）→ 28.86 | 646.83（Libra）→ 236.55 | 0.676（Libra）→ 2.136 |
+| Buffered I/O · CANN 锁页缓冲 | 同时到达 | 49.73（Bidaw）→ 43.04 | 324.90（Libra）→ 117.17 | 1.466（Libra）→ 3.594 |
+| Buffered I/O · CANN 锁页缓冲 | 高回载量请求早到 25 ms | 44.77（原 SuperLoad）→ 20.42 | 322.65（原 SuperLoad）→ 124.43 | 1.455（Libra）→ 3.491 |
+| Direct I/O · 普通缓冲 | 同时到达 | 287.20（Bidaw）→ 157.34 | 1861.33（Strata I/O）→ 1299.80 | 0.283（Strata I/O）→ 0.343 |
+| Direct I/O · 普通缓冲 | 高回载量请求早到 25 ms | 558.63（原 SuperLoad）→ 229.38 | 1802.24（Strata I/O）→ 1210.80 | 0.282（Strata I/O）→ 0.374 |
 
-[复现命令](../README.md#运行方法对照) · [完整图表](https://kimmozag.github.io/SuperLoad/#comparison) · [汇总 JSON](https://kimmozag.github.io/SuperLoad/assets/comparison-summary.json) · [原始测量](https://github.com/KimmoZAG/SuperLoad/releases/tag/results-comparison-910b2-2026-11-28) · [原 Direct I/O 发布批次](https://github.com/KimmoZAG/SuperLoad/releases/tag/results-comparison-910b2-2026-11-27)
+[完整逐方法图与表](https://kimmozag.github.io/SuperLoad/#comparison) · [同时到达 PDF](https://kimmozag.github.io/SuperLoad/figures/method-comparison-0ms.pdf) · [高回载量请求早到 25 ms PDF](https://kimmozag.github.io/SuperLoad/figures/method-comparison-25ms.pdf) · [原始测量](https://github.com/KimmoZAG/SuperLoad/releases/tag/results-superload-910b2-2026-11-28) · [复现命令](../README.md#运行方法对照)

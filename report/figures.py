@@ -5,7 +5,7 @@ import matplotlib
 matplotlib.use("Agg")
 from matplotlib import pyplot as plt
 from matplotlib.lines import Line2D
-from matplotlib.ticker import LogLocator, MaxNLocator, NullFormatter, ScalarFormatter
+from matplotlib.ticker import LogLocator, NullLocator, StrMethodFormatter
 
 
 MODES = {"buffered": "Buffered", "direct": "Direct I/O"}
@@ -42,7 +42,7 @@ RELOAD_METRICS = (
 )
 
 
-def render_reload_panels(groups, methods, output, name, *, mobile, log_metrics=("small_p95", "large_p95")):
+def render_reload_panels(groups, methods, output, name, *, mobile):
     """Draw comparison groups against shared metric axes."""
     rows, columns = len(groups), len(RELOAD_METRICS)
     if mobile:
@@ -53,36 +53,34 @@ def render_reload_panels(groups, methods, output, name, *, mobile, log_metrics=(
     else:
         height = 5.75 + (rows - 2) * 2.4
         fig, axes = plt.subplots(rows, columns, figsize=(11.4, height), sharex="col", sharey=True)
-        fig.subplots_adjust(left=0.135, right=0.965 if rows == 3 else 0.982,
-                            top=1 - 0.10 * 5.75 / height, bottom=0.19 * 5.75 / height, hspace=0.42, wspace=0.29)
+        fig.subplots_adjust(left=0.215, right=0.978, top=0.915, bottom=0.15, hspace=0.34, wspace=0.23)
     for col, (metric, label) in enumerate(RELOAD_METRICS):
         points = [v for group in groups.values() for method in methods
                   for v in group[method][metric]["trials"]]
         latency = metric != "gib_s"
-        log_scale = metric in log_metrics
-        if latency:
-            axis_label = "KV-ready latency (ms, log)" if log_scale else "KV-ready latency (ms)"
-        else:
-            axis_label = "Pair throughput (GiB/s)"
+        axis_label = "HBM-ready latency (ms, log)" if latency else "Pair throughput (GiB/s, log)"
         direction = "← Lower is better" if latency else "Higher is better →"
         for i, (group_label, group) in enumerate(groups.items()):
-            index = rows * col + i if mobile else columns * i + col
+            index = columns * i + col
             ax = axes.flat[index]
-            panel_title(ax, chr(ord("A") + index), f"{group_label} · {label}")
-            if log_scale:
-                ax.set_xscale("log")
-                ax.set_xlim(min(points) * 0.8, max(points) * 1.2)
-                ax.xaxis.set_major_locator(LogLocator(base=10, subs=(1, 3)))
-                ax.xaxis.set_major_formatter(ScalarFormatter())
-                ax.xaxis.set_minor_formatter(NullFormatter())
-            elif latency:
-                margin = (max(points) - min(points)) * 0.12
-                ax.set_xlim(min(points) - margin, max(points) + margin)
-                ax.xaxis.set_major_locator(MaxNLocator(nbins=4))
+            if mobile:
+                ax.set_title(f"{group_label}\n{label}", loc="left", pad=8)
             else:
-                ax.set_xlim(0, max(points) * 1.10)
-            ax.set_xlabel(f"{axis_label}\n{direction}" if i == rows - 1 or mobile else direction)
-            ax.set_yticks(range(len(methods)), [name for name, _ in methods.values()])
+                if i == 0:
+                    ax.set_title(label, pad=11)
+                if col == 0:
+                    placement = ax.get_position()
+                    fig.text(0.025, (placement.y0 + placement.y1) / 2,
+                             group_label.replace(" · ", "\n"), va="center", fontsize=9,
+                             fontweight="semibold", linespacing=1.3)
+            ax.set_xscale("log")
+            ax.set_xlim(min(points) * 0.8, max(points) * 1.2)
+            ax.xaxis.set_major_locator(LogLocator(base=10, subs=(1, 3) if latency else (1, 2, 5)))
+            ax.xaxis.set_major_formatter(StrMethodFormatter("{x:g}"))
+            ax.xaxis.set_minor_locator(NullLocator())
+            if i == rows - 1 or mobile:
+                ax.set_xlabel(f"{axis_label}\n{direction}")
+            ax.set_yticks(range(len(methods)), [name for name, _ in methods.values()], fontsize=8.5)
             ax.set_ylim(len(methods) - 0.5, -0.5)
             ax.grid(axis="x")
             for j, (method, (_, color)) in enumerate(methods.items()):
@@ -91,7 +89,7 @@ def render_reload_panels(groups, methods, output, name, *, mobile, log_metrics=(
                 ax.hlines(j, min(values), max(values), color=color, linewidth=1.4, alpha=0.65)
                 offsets = [j + (n - (len(values) - 1) / 2) * 0.19 for n in range(len(values))]
                 ax.scatter(values, offsets, facecolors="white", edgecolors=color, s=24, zorder=3)
-                ax.scatter(stats["median"], j, color=color, marker="D", s=28, zorder=4)
+                ax.scatter(stats["median"], j, color=color, marker="D", s=36 if method == "superload" else 28, zorder=4)
     legend = [
         Line2D([], [], marker="D", color="#4d5c64", ls="none", label="Median across trials"),
         Line2D([], [], marker="o", markerfacecolor="white", color="#4d5c64", ls="none",

@@ -46,7 +46,7 @@ def parser():
 
     for name, help_text, measure, repeat in (
         ("prefix-bench", "measure the contention controls", measure_prefix, 3),
-        ("prefix-compare", "compare five methods on identical prefix reloads", compare_prefix, 2),
+        ("prefix-compare", "compare six methods on identical prefix reloads", compare_prefix, 2),
     ):
         command = commands.add_parser(name, help=help_text)
         command.set_defaults(measure=measure)
@@ -62,9 +62,11 @@ def parser():
         if measure is compare_prefix:
             command.add_argument("--chunk-blocks", type=positive, default=2)
             command.add_argument(
-                "--host-buffer", choices=("pageable", "paired"), default="pageable",
-                help="compare ordinary and CANN pinned host buffers in the same Buffered I/O run",
+                "--host-buffer", choices=("pageable", "pinned", "paired"), default="pageable",
+                help="select ordinary and/or CANN-pinned staging for Buffered I/O",
             )
+            command.add_argument("--numa-node", type=int,
+                                 help="NPU-local NUMA node for the optimized pageable Buffered I/O pipeline")
     return cli
 
 

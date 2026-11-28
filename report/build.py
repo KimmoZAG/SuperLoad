@@ -51,7 +51,7 @@ def figure(directory, name, alt, *, note=""):
 
 def arrival_figures(directory, name, description):
     return "".join(
-        f"<article><h3>{comparison.GAPS[gap]}</h3>"
+        f'<article id="{name}-{gap}ms"><h3>{comparison.GAPS[gap]}</h3>'
         + figure(directory, f"{name}-{gap}ms", f"{comparison.GAPS[gap]} · {description}")
         + "</article>"
         for gap in (25, 0)

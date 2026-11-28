@@ -37,8 +37,8 @@ def render_finding(summary):
     return (
         '<div class="comparison-finding">'
         f'<strong>{wins}/{len(scores)} 项</strong>'
-        '<p><b>优化后 SuperLoad 领先于同条件的最强对照</b>'
-        '<span>每种 I/O／缓冲配置和到达条件分别比较两组 HBM 就绪 P95 与双请求吞吐。</span></p></div>'
+        '<p><b>优化后 SuperLoad 领先最强对照</b>'
+        '<span>在相同的 I/O 配置和到达条件下，逐项比较两组 HBM 就绪 P95 和双请求吞吐。</span></p></div>'
     )
 
 

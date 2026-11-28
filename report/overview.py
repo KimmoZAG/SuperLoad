@@ -72,12 +72,11 @@ def render_poster_results(summary):
     return (
         '<section class="poster-results" aria-labelledby="poster-results-title">'
         '<h2 id="poster-results-title">低回载量组 HBM 就绪 P95</h2>'
+        '<p class="result-context">Direct I/O · 高回载量请求早到 25 ms · '
+        f'{direct["pairs"]} 对 × {direct["repeat"]} 轮</p>'
         f'<ul class="result-bars">{"".join(small_rows)}</ul>'
         '<dl class="poster-tradeoffs">'
         f'<div><dt>高回载量组 HBM 就绪 P95</dt><dd>{large_before:.2f} → {large_after:.2f} <small>s</small></dd></div>'
         f'<div><dt>双请求吞吐</dt><dd>{throughput_before:.3f} → {throughput_after:.3f} '
-        '<small>GiB/s</small></dd></div></dl>'
-        '<p class="result-context">Direct I/O · 高回载量请求早到 25 ms · '
-        f'{direct["pairs"]} 对 × {direct["repeat"]} 轮</p>'
-        '<a class="result-link" href="#comparison">查看六种方法实测 <span aria-hidden="true">↓</span></a></section>'
+        '<small>GiB/s</small></dd></div></dl></section>'
     )

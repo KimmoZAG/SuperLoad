@@ -11,12 +11,12 @@
   <a class="skip" href="#main">跳到内容</a>
   <header class="top">
     <div class="frame top-inner">
-      <a class="wordmark" href="./"><span class="mark" aria-hidden="true"></span>SuperLoad</a>
+      <a class="wordmark" href="./">SuperLoad</a>
       <nav aria-label="报告导航">
         <a href="#overview">研究概览</a>
         <a href="#system-design">系统设计</a>
-        <a href="#comparison">方法对照</a>
-        <a href="#prefix-contention">问题验证</a>
+        <a href="#experiment-design">实验设计</a>
+        <a href="#comparison">实测结果</a>
       </nav>
       <a class="repo" href="https://github.com/KimmoZAG/SuperLoad">GitHub</a>
     </div>
@@ -25,15 +25,13 @@
     <section id="overview" class="research-poster" aria-labelledby="overview-title">
       <div class="poster-opening">
         <div class="poster-intro">
-          <p class="poster-context">Agent 前缀 KV Cache · 昇腾 910B2</p>
-          <h1 id="overview-title">KV 前缀回载中的<br>队首阻塞</h1>
-          <p class="poster-background">Agent 会话间歇推进，可复用上下文规模各异。高速缓存容量有限，续接请求可能从存储回载并争用通路。</p>
-          <p class="poster-question">如何缩短低回载量请求因高回载量请求占用通路而产生的等待，从而降低低回载量组的 KV 就绪尾延迟？</p>
-          <ol class="reload-path" aria-label="KV 回载路径">
-            <li>存储</li>
-            <li>主机 DRAM</li>
-            <li>NPU HBM</li>
-          </ol>
+          <p class="poster-context">Agent 会话续接 · 昇腾 910B2</p>
+          <h1 id="overview-title">降低前缀 KV<br> <span>回载的尾延迟</span></h1>
+          <p class="poster-background">Agent 会话从存储回载前缀时，高回载量请求可能阻塞后到的低回载量请求。SuperLoad 用同一个调度器安排存储读取和 H2D 拷贝，让后到请求在两个阶段都能优先推进。</p>
+          <div class="hero-actions">
+            <a class="primary-action" href="#comparison">查看实测结果 <span aria-hidden="true">↓</span></a>
+            <a class="secondary-action" href="#system-design">阅读系统设计 <span aria-hidden="true">→</span></a>
+          </div>
         </div>
         @@POSTER_RESULTS@@
       </div>
@@ -62,9 +60,9 @@
             <span class="low-volume-key">低回载量组 @@LOW_RELOAD_RANGE@@</span>
             <span class="high-volume-key">高回载量组 @@HIGH_RELOAD_RANGE@@</span>
           </div>
-          <p class="timeline-caption">示意图从左到右表示执行顺序。回载量按单次从存储读取的 KV 字节数计。</p>
-          <p class="evidence-copy">SuperLoad 让已提交的传输继续执行，并在下一次可用的提交机会推进后到的低回载量请求。</p>
-          <a class="evidence-link" href="#system-design">查看跨阶段调度 <span aria-hidden="true">↓</span></a>
+          <p class="timeline-caption">横向表示执行顺序。回载量按实际从存储读取的 KV 字节数计。</p>
+          <p class="evidence-copy">高回载量请求已提交的传输继续执行。低回载量请求可以在它完成前进入流水线。</p>
+          <a class="evidence-link" href="#prefix-contention">查看队首阻塞的实测证据 <span aria-hidden="true">↓</span></a>
         </section>
         <section class="poster-motivation" aria-labelledby="poster-motivation-title">
           <h2 id="poster-motivation-title">回载何时比重算更快？</h2>
@@ -80,7 +78,7 @@
         </div>
       </details>
     </section>
-    <section id="system-design" aria-labelledby="system-design-title">
+    <section id="system-design" class="report-section" aria-labelledby="system-design-title">
       <h2 id="system-design-title">SuperLoad 如何协调两阶段回载</h2>
       <p class="section-lead">同一调度器跟踪各请求的待回载 KV 页、目标 HBM 地址和搬运进度。每次提交存储读取或 H2D 拷贝时，由它选择下一块要搬运的 KV。</p>
       <figure class="pipeline-diagram">
@@ -109,9 +107,9 @@
         <a href="https://github.com/KimmoZAG/SuperLoad/blob/main/docs/reproduction.md#流水线行为测试">查看流水线行为测试</a>
       </div>
     </section>
-    <section id="comparison" aria-labelledby="comparison-title">
-      <h2 id="comparison-title">六种方法实测</h2>
-      <p class="section-lead">在昇腾 910B2 上，将优化后 SuperLoad 与原生 FIFO、Bidaw、Strata I/O、Libra 和原 SuperLoad 交错运行，对照相同的请求对和到达条件。</p>
+    <section id="experiment-design" class="report-section" aria-labelledby="experiment-design-title">
+      <h2 id="experiment-design-title">用相同的请求对检验六种方法</h2>
+      <p class="section-lead">在昇腾 910B2 上交错运行优化后 SuperLoad 和五个对照。每种方法使用相同的回载内容和到达间隔。</p>
       <div class="experiment-protocol">
         <div>
           <h3>请求对如何构建</h3>
@@ -131,13 +129,21 @@
           </dl>
         </div>
       </div>
+    </section>
+    <section id="comparison" class="report-section" aria-labelledby="comparison-title">
+      <h2 id="comparison-title">六种方法实测</h2>
       @@COMPARISON_FINDING@@
-      <p class="comparison-guide">图中 SuperLoad (orig.) 为原 16 MiB 固定分块轮转，SuperLoad (opt.) 为优化后的流水线。空心圆表示单轮，实心菱形表示各轮中位数。横轴为对数刻度，箭头标出改善方向。</p>
+      <nav class="figure-nav" aria-label="按到达条件浏览实测图">
+        <a href="#method-comparison-25ms">高回载量请求早到 25 ms</a>
+        <a href="#method-comparison-0ms">同时到达</a>
+        <a href="#comparison-values">逐项数值</a>
+      </nav>
+      <p class="comparison-guide"><span>○ 单轮</span><span>◆ 各轮中位数</span><span>箭头标出改善方向</span></p>
       <div class="figure-stack">@@COMPARISON@@</div>
       <details class="comparison-tables">
         <summary>查看六种方法的逐项数值</summary>
-        <p>普通 Buffered I/O 中，优化后 SuperLoad 使用 2 MiB 透明大页，对照沿用普通缓冲。Bidaw、Strata I/O、Libra 为本机回载机制实现。</p>
-        @@COMPARISON_TABLES@@
+        <p>SuperLoad (orig.) 为原 16 MiB 固定分块轮转，SuperLoad (opt.) 为优化后的流水线。普通 Buffered I/O 中，优化后 SuperLoad 使用 2 MiB 透明大页，对照沿用普通缓冲。Bidaw、Strata I/O、Libra 为本机回载机制实现。</p>
+        <div id="comparison-values">@@COMPARISON_TABLES@@</div>
       </details>
       <div class="resources">
         <a href="assets/comparison-summary.json" download>对照汇总 JSON</a>
@@ -145,12 +151,12 @@
         <a href="https://github.com/KimmoZAG/SuperLoad/blob/main/docs/comparison.md">对照设置与结果解读</a>
       </div>
     </section>
-    <section id="recompute-crossover" aria-labelledby="recompute-crossover-title">
+    <section id="recompute-crossover" class="report-section" aria-labelledby="recompute-crossover-title">
       <h2 id="recompute-crossover-title">回载延迟与重算阈值</h2>
-      <p>左图比较同一批低回载量请求在两种调度下的 HBM 就绪延迟。右图统计在给定重算耗时下，有多少对请求会从「重算更快」变为「回载更快」。</p>
+      <p class="section-lead">第一幅子图比较同一批低回载量请求在两种调度下的 HBM 就绪延迟。第二幅统计在给定重算耗时下，有多少对请求会从「重算更快」变为「回载更快」。</p>
       @@RECOMPUTE_CROSSOVER@@
     </section>
-    <section id="prefix-contention" aria-labelledby="prefix-title">
+    <section id="prefix-contention" class="report-section" aria-labelledby="prefix-title">
       <h2 id="prefix-title">队首阻塞与负载依据</h2>
       @@PREFIX_RESULTS@@
       <div class="resources">

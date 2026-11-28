@@ -32,6 +32,8 @@ python3 -m experiments reproduce --corpus data/reproduction --output runs/reprod
 
 真机入口固定正式测量的计划和源码提交，运行三种配置和全量 HBM 回读，并保存实际命令与环境。设备编号、NUMA 结点和存储标签可按现场调整。 [离线审计与完整复现说明](docs/reproduction.md)
 
+正式实验的 16 对请求可从公开 Mooncake 轨迹重建，并与 Release 的计划逐字节核对。 [样本重建步骤](docs/reproduction.md#从公开轨迹重建正式样本) · [排除清单](experiments/cohort-exclusions.json)
+
 ## 运行方法对照
 
 使用 Linux 和 Python 3.10+。实测需要昇腾驱动、CANN 和支持 `O_DIRECT` 的文件系统。使用发布包内的 `plan.json` 可以复用论文图的同一批请求对，也可以从公开轨迹创建新的对照计划。

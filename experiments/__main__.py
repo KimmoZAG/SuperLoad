@@ -40,6 +40,10 @@ def parse_args():
     verify = commands.add_parser("verify-hbm", help="rerun the full-page checks for measured minimum/maximum pairs")
     hardware_arguments(verify)
     verify.add_argument("--results", type=Path, required=True, help="measurement directory containing plan and results")
+    cohort = commands.add_parser("rebuild-cohort", help="regenerate and verify the published plan from the Mooncake trace")
+    cohort.add_argument("--trace", type=Path, required=True, help="Mooncake FAST'25 Tool & Agent trace JSONL")
+    cohort.add_argument("--archive", type=Path, help="offline copy of the pinned Release ZIP")
+    cohort.add_argument("--output", type=Path, required=True, help="write the verified plan as JSON")
     return parser.parse_args()
 
 
@@ -51,6 +55,15 @@ def print_audit(report):
 
 def main():
     args = parse_args()
+    if args.command == "rebuild-cohort":
+        from .cohort import rebuild_cohort
+
+        release = ResultsRelease.read(RELEASE)
+        with release.unpack(ROOT / "build" / "results", archive=args.archive) as reference:
+            plan = rebuild_cohort(args.trace, (reference / "plan.json").read_bytes())
+        write_json(plan, args.output)
+        print(f"Rebuilt {len(plan['pairs'])} request pairs; plan bytes match {release.tag}.")
+        return 0
     if args.command == "verify-hbm":
         from .verify_hbm import verify_hbm
 
